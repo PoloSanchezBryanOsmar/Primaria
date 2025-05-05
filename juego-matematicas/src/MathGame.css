@@ -1,0 +1,213 @@
+.code-org-homepage {
+  font-family: Arial, sans-serif;
+  margin: 0;
+  padding: 0;
+  background-color: #1a202c;
+  color: white;
+}
+
+/* Navigation Styles */
+.main-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #20b2aa;
+  padding: 15px 30px;
+}
+
+.nav-left {
+  display: flex;
+  align-items: center;
+}
+
+.logo {
+  font-weight: bold;
+  font-size: 20px;
+  margin-right: 20px;
+}
+
+.nav-links {
+  display: flex;
+  gap: 15px;
+}
+
+.nav-links a {
+  color: white;
+  text-decoration: none;
+}
+
+.nav-right {
+  display: flex;
+  gap: 10px;
+}
+
+.btn {
+  padding: 8px 15px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.btn-primary {
+  background-color: white;
+  color: #20b2aa;
+  border: none;
+}
+
+.btn-secondary {
+  background-color: transparent;
+  color: white;
+  border: 1px solid white;
+}
+
+/* Hero Section Styles */
+.hero-section {
+  display: flex;
+  background-color: #2d3748;
+  padding: 50px 30px;
+  align-items: center;
+}
+
+.hero-content {
+  width: 50%;
+  padding-right: 30px;
+}
+
+.hero-subtitle {
+  color: #20b2aa;
+  margin-bottom: 10px;
+}
+
+.hero-title {
+  font-size: 2.5em;
+  margin-bottom: 15px;
+}
+
+.hero-description {
+  margin-bottom: 15px;
+}
+
+.hero-collab {
+  margin-bottom: 20px;
+}
+
+.amazon-text {
+  font-weight: bold;
+}
+
+.btn-explore {
+  background-color: white;
+  color: #2d3748;
+  padding: 12px 20px;
+  border: none;
+}
+
+.hero-graphic {
+  width: 50%;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.ai-box {
+  position: relative;
+  background-color: #4a5568;
+  padding: 30px;
+  border-radius: 10px;
+}
+
+.ai-content {
+  background-color: #718096;
+  width: 250px;
+  height: 200px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  border-radius: 10px;
+}
+
+.ai-icon {
+  font-size: 4em;
+}
+
+.user-icon, .chat-icon {
+  position: absolute;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.user-icon {
+  top: -10px;
+  right: -10px;
+  background-color: #9c27b0;
+}
+
+.chat-icon {
+  bottom: -10px;
+  left: -10px;
+  background-color: #2196f3;
+}
+
+/* Grid Section Styles */
+.grid-section {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  padding: 30px;
+}
+
+.grid-image-container {
+  width: 100%;
+  height: 250px; /* Fixed height for all grid images */
+  overflow: hidden;
+  margin-bottom: 15px;
+}
+
+.grid-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover; /* Ensures image covers the container while maintaining aspect ratio */
+  object-position: center; /* Centers the image */
+}
+
+.grid-item {
+  border-radius: 10px;
+  padding: 20px;
+  text-align: center;
+}
+
+.grid-item img {
+  max-width: 100%;
+  margin-bottom: 15px;
+}
+
+.grid-item h2 {
+  margin-bottom: 10px;
+}
+
+.grid-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 15px;
+}
+
+.grid-buttons button {
+  padding: 10px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.teal { background-color: #20b2aa; }
+.purple { background-color: #9c27b0; }
+.blue { background-color: #2196f3; }
+.green { background-color: #8bc34a; }
+
+.teal .grid-buttons button { color: #20b2aa; }
+.purple .grid-buttons button { color: #9c27b0; }
+.blue .grid-buttons button { color: #2196f3; }
+.green .grid-buttons button { color: #8bc34a; }
