@@ -1,0 +1,71 @@
+const db = require('../config/db');
+
+// Obtener todos los docentes
+exports.getTeachers = async (req, res) => {
+  try {
+    const query = 'SELECT * FROM teachers';
+    const [results] = await db.query(query);
+    res.status(200).json(results);
+  } catch (err) {
+    console.error('Error al obtener los docentes:', err);
+    res.status(500).json({ error: 'Error al obtener los docentes' });
+  }
+};
+
+// Crear un nuevo docente
+exports.createTeacher = async (req, res) => {
+    try {
+      const { name, email } = req.body;
+      // Validar datos de entrada
+      if (!name || !email) {
+        return res.status(400).json({ error: 'Nombre y email son requeridos' });
+      }
+      
+      const query = 'INSERT INTO teachers (name, email) VALUES (?, ?)';
+      const [results] = await db.query(query, [name, email]);
+      res.status(201).json({ message: 'Docente creado exitosamente', id: results.insertId });
+    } catch (err) {
+      console.error('Error al crear el docente:', err);
+      res.status(500).json({ error: 'Error al crear el docente' });
+    }
+  };
+
+// Actualizar un docente existente
+exports.updateTeacher = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, email } = req.body;
+    const query = 'UPDATE teachers SET name = ?, email = ? WHERE id = ?';
+    const [results] = await db.query(query, [name, email, id]);
+    if (results.affectedRows === 0) 
+      return res.status(404).json({ error: 'Docente no encontrado' });
+    res.status(200).json({ message: 'Docente actualizado exitosamente' });
+  } catch (err) {
+    console.error('Error al actualizar el docente:', err);
+    res.status(500).json({ error: 'Error al actualizar el docente' });
+  }
+};
+
+// Eliminar un docente
+exports.deleteTeacher = async (req, res) => {
+    try {
+      const { id } = req.params;
+      // Primero verificamos si el docente está asignado a algún grupo
+      const checkGroupsQuery = 'SELECT * FROM `groups` WHERE teacher_id = ?';
+      const [groups] = await db.query(checkGroupsQuery, [id]);
+      
+      if (groups.length > 0) 
+        return res.status(400).json({ error: 'No se puede eliminar este docente porque está asignado a grupos' });
+      
+      const deleteQuery = 'DELETE FROM teachers WHERE id = ?';
+      const [results] = await db.query(deleteQuery, [id]);
+      
+      if (results.affectedRows === 0) 
+        return res.status(404).json({ error: 'Docente no encontrado' });
+      
+      res.status(200).json({ message: 'Docente eliminado exitosamente' });
+    } catch (err) {
+      console.error('Error al eliminar el docente:', err);
+      res.status(500).json({ error: 'Error al eliminar el docente' });
+    }
+  };
