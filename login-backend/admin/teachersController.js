@@ -12,23 +12,33 @@ exports.getTeachers = async (req, res) => {
   }
 };
 
-// Crear un nuevo docente
+// Crear un nuevo docente y su cuenta de usuario
 exports.createTeacher = async (req, res) => {
-    try {
-      const { name, email } = req.body;
-      // Validar datos de entrada
-      if (!name || !email) {
-        return res.status(400).json({ error: 'Nombre y email son requeridos' });
-      }
-      
-      const query = 'INSERT INTO teachers (name, email) VALUES (?, ?)';
-      const [results] = await db.query(query, [name, email]);
-      res.status(201).json({ message: 'Docente creado exitosamente', id: results.insertId });
-    } catch (err) {
-      console.error('Error al crear el docente:', err);
-      res.status(500).json({ error: 'Error al crear el docente' });
+  try {
+    const { name, email } = req.body;
+
+    // Validar datos de entrada
+    if (!name || !email) {
+      return res.status(400).json({ error: 'Nombre y email son requeridos' });
     }
-  };
+
+    // Insertar en teachers
+    const teacherQuery = 'INSERT INTO teachers (name, email) VALUES (?, ?)';
+    const [teacherResult] = await db.query(teacherQuery, [name, email]);
+
+    // Insertar en users con contraseña predeterminada y tipo "docente"
+    const userQuery = `
+      INSERT INTO users (username, password, name, user_type)
+      VALUES (?, ?, ?, 'docente')
+    `;
+    await db.query(userQuery, [name, '123456', name]); // Contraseña temporal
+
+    res.status(201).json({ message: 'Docente creado exitosamente', id: teacherResult.insertId });
+  } catch (err) {
+    console.error('Error al crear el docente:', err);
+    res.status(500).json({ error: 'Error al crear el docente' });
+  }
+};
 
 // Actualizar un docente existente
 exports.updateTeacher = async (req, res) => {
