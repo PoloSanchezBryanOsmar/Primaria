@@ -1,7 +1,7 @@
 :root {
   --primary-color: #2563eb;
   --primary-light: #dbeafe;
-  --text-color: #334155;
+  --text-color: #0c0101;
   --border-color: #e2e8f0;
   --danger-color: #ef4444;
   --success-color: #10b981;
@@ -80,12 +80,13 @@ body {
   border: none;
   border-bottom: 2px solid transparent;
   cursor: pointer;
-  color: var(--text-color);
+  color: white;
   font-weight: 500;
+  font-size: 20px;
 }
 
 .nav-tab.active {
-  color: var(--primary-color);
+  color: black;
   border-bottom: 2px solid var(--primary-color);
 }
 
