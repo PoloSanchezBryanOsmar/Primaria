@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './login.css';
 
@@ -8,6 +8,17 @@ function Login({ setCurrentUser, setIsAuthenticated }) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const navigate = useNavigate();
+
+  // Añadir clase al body solo cuando el componente está montado
+  useEffect(() => {
+    // Añadir clase de login al body
+    document.body.classList.add('login-page');
+    
+    // Cleanup function - remover la clase cuando el componente se desmonte
+    return () => {
+      document.body.classList.remove('login-page');
+    };
+  }, []);
 
   const handleLogin = async (e) => {
     e.preventDefault();

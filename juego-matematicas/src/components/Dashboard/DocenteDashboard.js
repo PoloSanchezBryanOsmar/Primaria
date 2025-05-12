@@ -11,13 +11,18 @@ const DocenteDashboard = ({ user, onLogout }) => {
     { name: 'Ciencias Naturales', icon: '🔬' },
     { name: 'Cívica y Ética', icon: '⚖️' }
   ];
-  
+
+  // Añadir más debug para identificar posibles problemas
+  console.log("Información del usuario:", user);
+  console.log("Grupos asignados:", user.assignedGroups);
+
   return (
     <div className="docente-dashboard">
       {/* Encabezado con info del usuario */}
       <header className="dashboard-header">
         <h2>Bienvenido, {user.name}</h2>
         <p>Rol: <strong>{user.role}</strong></p>
+        
         {/* Mostrar grupos asignados si existen */}
         {user.assignedGroups && user.assignedGroups.length > 0 ? (
           <>
@@ -33,9 +38,11 @@ const DocenteDashboard = ({ user, onLogout }) => {
         ) : (
           <p>No tienes grupos asignados.</p>
         )}
+        
         {/* Botón de cierre de sesión */}
         <button onClick={onLogout} className="logout-button">Cerrar Sesión</button>
       </header>
+      
       {/* Sección de materias */}
       <section className="subjects-section">
         <h3>Tus Materias</h3>
@@ -47,8 +54,8 @@ const DocenteDashboard = ({ user, onLogout }) => {
               .replace(/\s+/g, "-");
             
             return (
-              <Link 
-                to={`/docente/${subjectUrl}`} 
+              <Link
+                to={`/docente/${subjectUrl}`}
                 key={index}
                 className="subject-card-link"
                 style={{ textDecoration: 'none', color: 'inherit' }}
