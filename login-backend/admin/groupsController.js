@@ -24,21 +24,24 @@ exports.getGroups = async (req, res) => {
 };
 // Crear un nuevo grupo
 exports.createGroup = async (req, res) => {
-    try {
-      const { name, gradeId, teacherId } = req.body;
-      // Validar datos de entrada
-      if (!name || !gradeId) {
-        return res.status(400).json({ error: 'Nombre y grado son requeridos' });
-      }
-      
-      const query = 'INSERT INTO `groups` (name, grade_id, teacher_id) VALUES (?, ?, ?)';
-      const [results] = await db.query(query, [name, gradeId, teacherId || null]);
-      res.status(201).json({ message: 'Grupo creado exitosamente', id: results.insertId });
-    } catch (err) {
-      console.error('Error al crear el grupo:', err);
-      res.status(500).json({ error: 'Error al crear el grupo' });
+  try {
+    const { name, grade_id } = req.body;
+    if (!name || !grade_id) {
+      return res.status(400).json({ error: 'Nombre y grado son requeridos' });
     }
-  };
+
+    const query = 'INSERT INTO `groups` (name, grade_id) VALUES (?, ?)';
+    const [results] = await db.query(query, [name, grade_id]);
+
+    res.status(201).json({
+      message: 'Grupo creado exitosamente',
+      id: results.insertId
+    });
+  } catch (err) {
+    console.error('Error al crear el grupo:', err);
+    res.status(500).json({ error: 'Error al crear el grupo' });
+  }
+};
   
 // Actualizar un grupo existente
 exports.updateGroup = async (req, res) => {

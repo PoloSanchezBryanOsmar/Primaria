@@ -5,7 +5,6 @@ const pool = require('./config/db');
 const jwt = require('jsonwebtoken');
 const adminRoutes = require('./admin/adminRoutes');
 
-
 const app = express();
 const PORT = process.env.PORT || 5000;
 
@@ -61,24 +60,31 @@ app.post('/api/login', async (req, res) => {
 
     let assignedGroups = [];
 
-    // Si es un docente, buscar los grupos asignados
-if (user.user_type === 'docente') {
-  const [rows] = await pool.query(`
-    SELECT g.id AS groupId, g.name AS groupName, gr.name AS gradeName
-    FROM \`groups\` g
-    JOIN grades gr ON g.grade_id = gr.id
-    WHERE g.teacher_id = (
-      SELECT id FROM teachers WHERE name = ?
-    )
-  `, [user.name]);
-
-  assignedGroups = rows.map(row => ({
-    groupId: row.groupId,
-    groupName: row.groupName,
-    gradeName: row.gradeName
-  }));
-}
-
+    // Si es un docente, buscar los grados asignados (versión actualizada)
+    if (user.user_type === 'docente') {
+      // Obtener ID del docente
+      const [teacherResult] = await pool.query(
+        'SELECT id FROM teachers WHERE name = ?',
+        [user.name]
+      );
+      
+      if (teacherResult.length > 0) {
+        const teacherId = teacherResult[0].id;
+        
+        // Buscar grados asignados al docente
+        const [gradesResult] = await pool.query(`
+          SELECT g.id AS gradeId, g.name AS gradeName, g.level AS groupName
+          FROM grades g
+          WHERE g.teacher_id = ?
+        `, [teacherId]);
+        
+        assignedGroups = gradesResult.map(grade => ({
+          gradeId: grade.gradeId,
+          gradeName: grade.gradeName,
+          groupName: grade.groupName
+        }));
+      }
+    }
     // Generar token JWT
     const token = jwt.sign(
       { 
@@ -98,7 +104,7 @@ if (user.user_type === 'docente') {
         username: user.username,
         name: user.name,
         role: user.user_type,
-        assignedGroups // <-- Aquí enviamos los grupos asignados
+        assignedGroups // Mantener el mismo nombre para compatibilidad
       },
       token
     });
@@ -119,12 +125,12 @@ app.get('/', (req, res) => {
 
 // RUTAS PARA ALUMNOS
 
-// Obtener alumnos por grupo
-app.get('/api/admin/students/:groupId', verifyToken, async (req, res) => {
+// Obtener alumnos por grado
+app.get('/api/admin/students/:gradeId', verifyToken, async (req, res) => {
   try {
-    const { groupId } = req.params;
-    console.log(`Obteniendo estudiantes para el grupo: ${groupId}`); // Para debugging
-    const [rows] = await pool.query('SELECT * FROM students WHERE group_id = ?', [groupId]);
+    const { gradeId } = req.params;
+    console.log(`Obteniendo estudiantes para el grado: ${gradeId}`); // Para debugging
+    const [rows] = await pool.query('SELECT * FROM students WHERE grade_id = ?', [gradeId]);
     res.json(rows);
   } catch (error) {
     console.error('Error al obtener alumnos:', error);
@@ -135,14 +141,14 @@ app.get('/api/admin/students/:groupId', verifyToken, async (req, res) => {
 // Registrar un nuevo alumno
 app.post('/api/admin/students', verifyToken, async (req, res) => {
   try {
-    const { name, group_id } = req.body;
-    if (!name || !group_id) {
-      return res.status(400).json({ error: 'Nombre y grupo son requeridos' });
+    const { name, grade_id } = req.body;
+    if (!name || !grade_id) {
+      return res.status(400).json({ error: 'Nombre y grado son requeridos' });
     }
 
     const [result] = await pool.query(
-      'INSERT INTO students (name, group_id) VALUES (?, ?)',
-      [name, group_id]
+      'INSERT INTO students (name, grade_id) VALUES (?, ?)',
+      [name, grade_id]
     );
     res.status(201).json({ message: 'Alumno registrado', id: result.insertId });
   } catch (error) {
@@ -155,11 +161,11 @@ app.post('/api/admin/students', verifyToken, async (req, res) => {
 app.put('/api/admin/students/:id', verifyToken, async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, group_id, tasks_done, average_grade } = req.body;
+    const { name, grade_id, tasks_done, average_grade } = req.body;
 
     const [result] = await pool.query(
-      'UPDATE students SET name = ?, group_id = ?, tasks_done = ?, average_grade = ? WHERE id = ?',
-      [name, group_id, tasks_done, average_grade, id]
+      'UPDATE students SET name = ?, grade_id = ?, tasks_done = ?, average_grade = ? WHERE id = ?',
+      [name, grade_id, tasks_done, average_grade, id]
     );
 
     if (result.affectedRows === 0) {
