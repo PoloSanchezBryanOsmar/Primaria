@@ -195,7 +195,115 @@ app.delete('/api/admin/students/:id', verifyToken, async (req, res) => {
     res.status(500).json({ error: 'Error al eliminar alumno' });
   }
 });
+// Rutas adicionales para el backend (server.js)
 
+// Ruta para guardar un nuevo puntaje
+app.post('/api/admin/scores', verifyToken, async (req, res) => {
+  try {
+    const { name, score, correctAnswers, totalAnswered, gradeId } = req.body;
+    
+    if (!name || score === undefined) {
+      return res.status(400).json({ error: 'Se requieren nombre y puntaje' });
+    }
+    
+    const [result] = await pool.query(
+      'INSERT INTO scores (name, score, correct_answers, total_answered, grade_id) VALUES (?, ?, ?, ?, ?)',
+      [name, score, correctAnswers || 0, totalAnswered || 10, gradeId]
+    );
+    
+    res.status(201).json({ 
+      message: 'Puntaje guardado correctamente',
+      id: result.insertId
+    });
+  } catch (error) {
+    console.error('Error al guardar puntaje:', error);
+    res.status(500).json({ error: 'Error al guardar el puntaje' });
+  }
+});
+
+// Obtener los mejores puntajes
+app.get('/api/admin/scores/top', verifyToken, async (req, res) => {
+  try {
+    const limit = req.query.limit || 10; // Por defecto, devolver los 10 mejores
+    const gradeId = req.query.gradeId; // Opcional, si queremos filtrar por grado
+    
+    let query = `
+      SELECT name, score, correct_answers as correctAnswers, total_answered as totalAnswered, grade_id as gradeId,
+      (SELECT CONCAT(g.name, ' - ', g.level) FROM grades g WHERE g.id = scores.grade_id) as gradeName
+      FROM scores
+    `;
+    
+    // Si se proporciona un gradeId, filtramos por ese grado
+    if (gradeId) {
+      query += ' WHERE grade_id = ?';
+      const [results] = await pool.query(query + ' ORDER BY score DESC, correct_answers DESC LIMIT ?', [gradeId, parseInt(limit)]);
+      res.json(results);
+    } else {
+      // Si no, devolvemos los mejores puntajes en general
+      const [results] = await pool.query(query + ' ORDER BY score DESC, correct_answers DESC LIMIT ?', [parseInt(limit)]);
+      res.json(results);
+    }
+  } catch (error) {
+    console.error('Error al obtener los mejores puntajes:', error);
+    res.status(500).json({ error: 'Error al obtener los puntajes' });
+  }
+});
+
+// Obtener información de un grado específico
+app.get('/api/admin/grades/:id', verifyToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const [rows] = await pool.query(`
+      SELECT g.*, t.name as teacher_name
+      FROM grades g
+      LEFT JOIN teachers t ON g.teacher_id = t.id
+      WHERE g.id = ?
+    `, [id]);
+    
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Grado no encontrado' });
+    }
+    
+    res.json(rows[0]);
+  } catch (error) {
+    console.error('Error al obtener grado:', error);
+    res.status(500).json({ error: 'Error al obtener información del grado' });
+  }
+});
+app.get('/api/admin/scores/stats/:gradeId', verifyToken, async (req, res) => {
+  try {
+    const { gradeId } = req.params;
+    
+    const [results] = await pool.query(`
+      SELECT 
+        COUNT(*) as totalAttempts,
+        COALESCE(AVG(score), 0) as avgScore,
+        COALESCE(MAX(score), 0) as highScore
+      FROM scores 
+      WHERE grade_id = ?
+    `, [gradeId]);
+    
+    if (results.length === 0) {
+      return res.json({ 
+        totalAttempts: 0, 
+        avgScore: 0, 
+        highScore: 0 
+      });
+    }
+    
+    // Convertir a un formato redondeado
+    const stats = {
+      totalAttempts: parseInt(results[0].totalAttempts),
+      avgScore: Math.round(results[0].avgScore),
+      highScore: parseInt(results[0].highScore)
+    };
+    
+    res.json(stats);
+  } catch (error) {
+    console.error('Error al obtener estadísticas de puntajes:', error);
+    res.status(500).json({ error: 'Error al obtener estadísticas' });
+  }
+});
 // Iniciar servidor
 app.listen(PORT, () => {
   console.log(`Servidor ejecutándose en http://localhost:${PORT}`);

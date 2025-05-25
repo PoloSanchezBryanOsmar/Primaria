@@ -83,3 +83,32 @@ exports.deleteTeacher = async (req, res) => {
     res.status(500).json({ error: 'Error al eliminar el docente' });
   }
 };
+
+exports.getTeacherStats = async (req, res) => {
+  try {
+    const totalQuery = 'SELECT COUNT(*) as total FROM teachers';
+    const [totalResult] = await db.query(totalQuery);
+    const lastMonthQuery = `
+      SELECT COUNT(*) as total 
+      FROM teachers 
+      WHERE created_at < DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH)
+    `;
+    const [lastMonthResult] = await db.query(lastMonthQuery);
+    
+    const currentTotal = totalResult[0].total;
+    const lastMonthTotal = lastMonthResult[0].total;
+    
+    let percentChange = 0;
+    if (lastMonthTotal > 0) {
+      percentChange = Math.round(((currentTotal - lastMonthTotal) / lastMonthTotal) * 100);
+    }
+    
+    res.status(200).json({
+      total: currentTotal,
+      change: percentChange
+    });
+  } catch (err) {
+    console.error('Error al obtener estadísticas de docentes:', err);
+    res.status(500).json({ error: 'Error al obtener estadísticas de docentes' });
+  }
+};

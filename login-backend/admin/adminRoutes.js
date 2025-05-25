@@ -22,11 +22,11 @@ router.get('/teachers', teachersController.getTeachers);
 router.post('/teachers', teachersController.createTeacher);
 router.put('/teachers/:id', teachersController.updateTeacher);
 router.delete('/teachers/:id', teachersController.deleteTeacher);
-
+router.get('/teachers/stats', teachersController.getTeacherStats);
 // Rutas para estudiantes
 router.get('/students/:gradeId', studentsController.getStudentsByGrade);
 router.post('/students', studentsController.createStudent);
 router.put('/students/:id', studentsController.updateStudent);
 router.delete('/students/:id', studentsController.deleteStudent);
-
+router.get('/students/stats', studentsController.getStudentStats);
 module.exports = router;
