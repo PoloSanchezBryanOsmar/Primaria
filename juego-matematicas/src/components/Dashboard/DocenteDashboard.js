@@ -69,29 +69,31 @@ const DocenteDashboard = ({ user, onLogout }) => {
             params: { gradeIds: gradeIds.join(',') } 
           });
           
-          // Cuando el backend esté implementado, usar los datos reales
-          // Por ahora, establecemos solo el de español como activo
-          setActiveQuizzes([
-            {
-              id: 'espanol',
-              title: 'Quiz de Español',
-              subjectId: 1,
-              gradeId: user.assignedGroups[0].gradeId,
-              questions: 10,
-              time: 60,
-              difficulty: 'Básico',
-              icon: '📚',
-              color: '#3498db'
-            }
-          ]);
+          // Mapear los resultados a un formato más útil
+          const fetchedQuizzes = response.data.map(quiz => ({
+            id: quiz.quiz_id,
+            title: quiz.title,
+            subjectId: quiz.subject_id,
+            gradeId: quiz.grade_id,
+            gradeName: quiz.grade_name,
+            gradeLevel: quiz.grade_level,
+            questions: quiz.questions,
+            time: quiz.time,
+            difficulty: quiz.difficulty,
+            icon: quiz.icon,
+            color: quiz.color
+          }));
+          
+          setActiveQuizzes(fetchedQuizzes);
         }
       } catch (error) {
         console.error('Error al cargar quizzes activos:', error);
       }
     };
-
+  
     fetchActiveQuizzes();
   }, [user]);
+  
 
   // Función para cargar estudiantes de un grupo específico
   const fetchStudents = async (gradeId) => {
