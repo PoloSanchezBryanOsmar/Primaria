@@ -304,6 +304,104 @@ app.get('/api/admin/scores/stats/:gradeId', verifyToken, async (req, res) => {
     res.status(500).json({ error: 'Error al obtener estadísticas' });
   }
 });
+// server.js - Añadir rutas para gestionar quizzes
+
+// Rutas para quizzes
+app.get('/api/quizzes', verifyToken, async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT * FROM quizzes');
+    res.json(rows);
+  } catch (error) {
+    console.error('Error al obtener quizzes:', error);
+    res.status(500).json({ error: 'Error al obtener quizzes' });
+  }
+});
+
+// Obtener quizzes para un grado específico con su estado de activación
+app.get('/api/admin/quizzes/grade/:gradeId', verifyToken, async (req, res) => {
+  try {
+    const { gradeId } = req.params;
+    
+    const [rows] = await pool.query(`
+      SELECT q.*, IFNULL(qa.is_active, 0) as is_active
+      FROM quizzes q
+      LEFT JOIN quiz_activations qa ON q.quiz_id = qa.quiz_id AND qa.grade_id = ?
+    `, [gradeId]);
+    
+    res.json(rows);
+  } catch (error) {
+    console.error('Error al obtener quizzes para el grado:', error);
+    res.status(500).json({ error: 'Error al obtener quizzes para el grado' });
+  }
+});
+
+// Activar/desactivar un quiz para un grado específico
+app.post('/api/admin/quizzes/activate', verifyToken, async (req, res) => {
+  try {
+    const { quizId, gradeId, isActive } = req.body;
+    const userId = req.user?.id || 1; // ID del usuario que está activando (por defecto 1 si no hay token)
+    
+    // Verificar si ya existe una activación para este quiz y grado
+    const [existing] = await pool.query(
+      'SELECT * FROM quiz_activations WHERE quiz_id = ? AND grade_id = ?',
+      [quizId, gradeId]
+    );
+    
+    if (existing.length > 0) {
+      // Actualizar el estado de activación
+      await pool.query(
+        'UPDATE quiz_activations SET is_active = ?, activated_by = ?, updated_at = NOW() WHERE quiz_id = ? AND grade_id = ?',
+        [isActive ? 1 : 0, userId, quizId, gradeId]
+      );
+    } else {
+      // Crear una nueva activación
+      await pool.query(
+        'INSERT INTO quiz_activations (quiz_id, grade_id, is_active, activated_by) VALUES (?, ?, ?, ?)',
+        [quizId, gradeId, isActive ? 1 : 0, userId]
+      );
+    }
+    
+    res.json({ 
+      success: true, 
+      message: `Quiz ${isActive ? 'activado' : 'desactivado'} correctamente` 
+    });
+  } catch (error) {
+    console.error('Error al activar/desactivar quiz:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Error al activar/desactivar quiz' 
+    });
+  }
+});
+
+// Obtener quizzes activos para un docente (basado en los grados asignados)
+app.get('/api/quizzes/active', verifyToken, async (req, res) => {
+  try {
+    const { gradeIds } = req.query;
+    
+    if (!gradeIds) {
+      return res.status(400).json({ 
+        error: 'Se requiere al menos un ID de grado' 
+      });
+    }
+    
+    const gradeIdsArray = gradeIds.split(',');
+    
+    // Obtener quizzes activos para los grados especificados
+    const [rows] = await pool.query(`
+      SELECT q.*, g.id as grade_id, g.name as grade_name, g.level as grade_level
+      FROM quizzes q
+      JOIN quiz_activations qa ON q.quiz_id = qa.quiz_id
+      JOIN grades g ON qa.grade_id = g.id
+      WHERE qa.is_active = 1 AND qa.grade_id IN (?)
+    `, [gradeIdsArray]);
+    
+    res.json(rows);
+  } catch (error) {
+    console.error('Error al obtener quizzes activos:', error);
+    res.status(500).json({ error: 'Error al obtener quizzes activos' });
+  }
+});
 // Iniciar servidor
 app.listen(PORT, () => {
   console.log(`Servidor ejecutándose en http://localhost:${PORT}`);
