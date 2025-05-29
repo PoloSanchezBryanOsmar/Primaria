@@ -5,6 +5,9 @@ import axios from 'axios';
 import QuizCatalog from './Quiz/QuizCatalog';
 import QuizPreview from './Quiz/QuizPreview';
 import QuizView from './Quiz/QuizView';
+import loguito1 from '../../img/loguito1.png';
+// Configuración de API (debe ir aquí)
+const api = axios.create({ baseURL: 'http://localhost:5000/api/admin' });
 
 // Componente para la sección de Resumen
 const ResumenPage = ({ grades, teachers, totalStudents }) => {
@@ -14,19 +17,19 @@ const ResumenPage = ({ grades, teachers, totalStudents }) => {
         <h1 className="page-title">Panel Administrativo</h1>
       </div>
       <div className="stats-grid">
-        <div className="stat-card">
+        <div className="stat-card purple">
           <div className="stat-title">Total Estudiantes</div>
           <div className="stat-value">{totalStudents}</div>
         </div>
-        <div className="stat-card">
+        <div className="stat-card yellow">
           <div className="stat-title">Total Maestros</div>
           <div className="stat-value">{teachers.length}</div>
         </div>
-        <div className="stat-card">
+        <div className="stat-card blue">
           <div className="stat-title">Actividades Completadas</div>
           <div className="stat-value">8,942</div>
         </div>
-        <div className="stat-card">
+        <div className="stat-card green">
           <div className="stat-title">Nuevos Registros</div>
           <div className="stat-value">128</div>
         </div>
@@ -601,16 +604,137 @@ const ContenidoPage = ({ grades, teachers }) => {
 
 // Componente para la sección de Configuración
 const ConfiguracionPage = () => {
+  const [form, setForm] = React.useState({
+    name: '',
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+  const [message, setMessage] = React.useState(null);
+
+  const token = localStorage.getItem('token');
+
+  // Cargar el nombre actual del admin
+  React.useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const res = await api.get('/profile', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setForm(f => ({ ...f, name: res.data.name || '' }));
+      } catch (err) {
+        setMessage({ type: 'error', text: 'No se pudo cargar el perfil.' });
+      }
+    };
+    fetchProfile();
+  }, [token]);
+
+  const handleChange = e => {
+    setForm({ ...form, [e.target.name]: e.target.value });
+  };
+
+  // Actualizar nombre en la base de datos
+  const handleProfileSubmit = async e => {
+    e.preventDefault();
+    try {
+      await api.put('/profile', { name: form.name }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setMessage({ type: 'success', text: 'Nombre actualizado correctamente.' });
+    } catch (err) {
+      setMessage({ type: 'error', text: err.response?.data?.error || 'Error al actualizar el nombre.' });
+    }
+  };
+
+  // Cambiar contraseña en la base de datos
+  const handlePasswordSubmit = async e => {
+    e.preventDefault();
+    if (form.newPassword !== form.confirmPassword) {
+      setMessage({ type: 'error', text: 'Las contraseñas no coinciden.' });
+      return;
+    }
+    try {
+      await api.put('/profile/password', {
+        currentPassword: form.currentPassword,
+        newPassword: form.newPassword
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setMessage({ type: 'success', text: 'Contraseña actualizada correctamente.' });
+      setForm(f => ({ ...f, currentPassword: '', newPassword: '', confirmPassword: '' }));
+    } catch (err) {
+      setMessage({ type: 'error', text: err.response?.data?.error || 'Error al cambiar la contraseña.' });
+    }
+  };
+
   return (
-    <div className="page-header">
+    <div className="config-full">
       <h1 className="page-title">Configuración</h1>
-      <p>Esta sección está en desarrollo.</p>
+      {message && (
+        <div className={`notification ${message.type}`}>
+          {message.text}
+        </div>
+      )}
+      <form className="form" onSubmit={handleProfileSubmit} style={{ marginBottom: 24 }}>
+        <h3 className="form-title">Datos del administrador</h3>
+        <div className="form-group">
+          <label>Nombre completo:</label>
+          <input
+            type="text"
+            name="name"
+            className="form-input"
+            value={form.name}
+            onChange={handleChange}
+            required
+          />
+        </div>
+        <div className="form-buttons">
+          <button type="submit" className="btn btn-primary">Actualizar datos</button>
+        </div>
+      </form>
+      <form className="form" onSubmit={handlePasswordSubmit}>
+        <h3 className="form-title">Cambiar contraseña</h3>
+        <div className="form-group">
+          <label>Contraseña actual:</label>
+          <input
+            type="password"
+            name="currentPassword"
+            className="form-input"
+            value={form.currentPassword}
+            onChange={handleChange}
+            required
+          />
+        </div>
+        <div className="form-group">
+          <label>Nueva contraseña:</label>
+          <input
+            type="password"
+            name="newPassword"
+            className="form-input"
+            value={form.newPassword}
+            onChange={handleChange}
+            required
+          />
+        </div>
+        <div className="form-group">
+          <label>Confirmar nueva contraseña:</label>
+          <input
+            type="password"
+            name="confirmPassword"
+            className="form-input"
+            value={form.confirmPassword}
+            onChange={handleChange}
+            required
+          />
+        </div>
+        <div className="form-buttons">
+          <button type="submit" className="btn btn-primary">Actualizar contraseña</button>
+        </div>
+      </form>
     </div>
   );
 };
 
-// Configuración de API
-const api = axios.create({ baseURL: 'http://localhost:5000/api/admin' });
 
 // Componente principal del Dashboard
 const AdminDashboard = ({ onLogout }) => {
@@ -847,7 +971,16 @@ const AdminDashboard = ({ onLogout }) => {
       <div className="sidebar">
         <div className="sidebar-header">
           <div className="sidebar-brand">
-            <span>EDUKIDS</span>
+            {/* Agrega la imagen aquí */}
+            <img 
+              src={loguito1}
+              alt="EDUKIDS"
+              style={{ width: 36, height: 36, marginRight: 10, borderRadius: '50%' }}
+            />
+            <span>
+              <span className="edukids-edu">EDU</span>
+              <span className="edukids-kids">KIDS</span>
+            </span>
           </div>
         </div>
         <div className="admin-title">Panel Administrativo</div>
@@ -877,9 +1010,16 @@ const AdminDashboard = ({ onLogout }) => {
           >
             <span>Configuración</span>
           </NavLink>
-          <div className="menu-item" onClick={onLogout}>
-            <span>Cerrar Sesión</span>
-          </div>
+          <div
+  className="menu-item"
+  onClick={onLogout}
+  style={{ cursor: 'pointer', userSelect: 'none' }}
+  tabIndex={0}
+  role="button"
+  onKeyPress={e => { if (e.key === 'Enter' || e.key === ' ') onLogout(); }}
+>
+  <span>Cerrar Sesión</span>
+</div>
         </div>
       </div>
       

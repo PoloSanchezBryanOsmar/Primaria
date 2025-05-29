@@ -26,7 +26,7 @@ const verifyToken = (req, res, next) => {
       next();
     });
   } else {
-    next(); // Por ahora, permitimos acceso sin token para debugging
+    return res.status(401).json({ error: 'Token requerido' });
   }
 };
 
@@ -402,6 +402,45 @@ app.get('/api/quizzes/active', verifyToken, async (req, res) => {
     res.status(500).json({ error: 'Error al obtener quizzes activos' });
   }
 });
+
+app.get('/api/admin/profile', verifyToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const [rows] = await pool.query('SELECT name FROM users WHERE id = ?', [userId]);
+    if (rows.length === 0) return res.status(404).json({ error: 'Usuario no encontrado' });
+    res.json({ name: rows[0].name });
+  } catch (error) {
+    res.status(500).json({ error: 'Error al obtener perfil' });
+  }
+});
+
+app.put('/api/admin/profile', verifyToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { name } = req.body;
+    await pool.query('UPDATE users SET name = ? WHERE id = ?', [name, userId]);
+    res.json({ message: 'Perfil actualizado correctamente' });
+  } catch (error) {
+    res.status(500).json({ error: 'Error al actualizar perfil' });
+  }
+});
+
+app.put('/api/admin/profile/password', verifyToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { currentPassword, newPassword } = req.body;
+    const [rows] = await pool.query('SELECT password FROM users WHERE id = ?', [userId]);
+    if (rows.length === 0) return res.status(404).json({ error: 'Usuario no encontrado' });
+    if (rows[0].password !== currentPassword) {
+      return res.status(400).json({ error: 'Contraseña actual incorrecta' });
+    }
+    await pool.query('UPDATE users SET password = ? WHERE id = ?', [newPassword, userId]);
+    res.json({ message: 'Contraseña actualizada correctamente' });
+  } catch (error) {
+    res.status(500).json({ error: 'Error al cambiar la contraseña' });
+  }
+});
+
 // Iniciar servidor
 app.listen(PORT, () => {
   console.log(`Servidor ejecutándose en http://localhost:${PORT}`);
