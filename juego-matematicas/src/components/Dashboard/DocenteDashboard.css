@@ -1173,3 +1173,196 @@
     font-size: 11px;
   }
 }
+
+/* Estilos para el modal de credenciales - añadir a DocenteDashboard.css */
+
+/* Modal de credenciales */
+.credentials-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.credentials-modal {
+  background-color: white;
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  max-width: 500px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.credentials-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 1px solid #eee;
+  background-color: #f8f9fa;
+  border-radius: 10px 10px 0 0;
+}
+
+.credentials-header h3 {
+  margin: 0;
+  color: #27ae60;
+  font-size: 18px;
+}
+
+.modal-close-btn {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: #666;
+  padding: 0;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: background-color 0.2s;
+}
+
+.modal-close-btn:hover {
+  background-color: #e9ecef;
+}
+
+.credentials-content {
+  padding: 20px;
+}
+
+.credentials-content p {
+  margin-bottom: 15px;
+  color: #555;
+  line-height: 1.5;
+}
+
+.credentials-info {
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  padding: 15px;
+  margin-bottom: 15px;
+}
+
+.credential-item {
+  display: flex;
+  align-items: center;
+  margin-bottom: 10px;
+  gap: 10px;
+}
+
+.credential-item:last-child {
+  margin-bottom: 0;
+}
+
+.credential-item label {
+  font-weight: 500;
+  color: #333;
+  min-width: 80px;
+}
+
+.credential-value {
+  background-color: white;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 8px 12px;
+  font-family: 'Courier New', monospace;
+  font-size: 14px;
+  flex: 1;
+  color: #2c3e50;
+}
+
+.copy-btn {
+  background-color: #3498db;
+  border: none;
+  border-radius: 4px;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s;
+}
+
+.copy-btn:hover {
+  background-color: #2980b9;
+}
+
+.credentials-note {
+  background-color: #fff3cd;
+  border: 1px solid #ffeaa7;
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 15px;
+}
+
+.credentials-note p {
+  margin: 0;
+  font-size: 14px;
+  color: #856404;
+}
+
+.credentials-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+}
+
+.credentials-actions .btn {
+  padding: 10px 20px;
+  border-radius: 5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.credentials-actions .btn-primary {
+  background-color: #3498db;
+  color: white;
+  border: none;
+}
+
+.credentials-actions .btn-primary:hover {
+  background-color: #2980b9;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .credentials-modal {
+    width: 95%;
+    margin: 20px;
+  }
+  
+  .credential-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 5px;
+  }
+  
+  .credential-item label {
+    min-width: auto;
+  }
+  
+  .credential-value {
+    width: 100%;
+    box-sizing: border-box;
+  }
+}
+
+/* Añadir a DocenteDashboard.css */
+
+.btn-info {
+  background-color: #17a2b8;
+  color: white;
+}
+
+.btn-info:hover {
+  background-color: #138496;
+}

@@ -1,4 +1,3 @@
-// DocenteDashboard.js completo con integración de quizzes
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
@@ -16,7 +15,9 @@ const DocenteDashboard = ({ user, onLogout }) => {
   const [notification, setNotification] = useState(null);
   const [selectedQuiz, setSelectedQuiz] = useState(null);
   const [activeQuizzes, setActiveQuizzes] = useState([]);
-  
+  const [showCredentials, setShowCredentials] = useState(false);
+  const [studentCredentials, setStudentCredentials] = useState(null);
+
   // Datos de las materias
   const subjects = [
     { id: 1, name: 'Español', icon: '📚' },
@@ -26,7 +27,7 @@ const DocenteDashboard = ({ user, onLogout }) => {
     { id: 5, name: 'Ciencias Naturales', icon: '🔬' },
     { id: 6, name: 'Cívica y Ética', icon: '⚖️' }
   ];
-  
+
   // Actividades recientes ficticias
   const recentActivities = [
     { id: 1, description: 'Calificación: Examen de Historia', date: '12/05/2025', group: '1A' },
@@ -42,13 +43,42 @@ const DocenteDashboard = ({ user, onLogout }) => {
     { id: 3, name: 'Entrega de calificaciones', date: '20/05/2025', group: 'Todos' }
   ];
 
-  // API
+  // API configuration mejorada con interceptors
   const api = axios.create({ 
-    baseURL: 'http://localhost:5000/api',
-    headers: {
-      'Authorization': `Bearer ${localStorage.getItem('token')}`
-    }
+    baseURL: 'http://localhost:5000/api'
   });
+
+  // Interceptor para añadir token automáticamente
+  api.interceptors.request.use(
+    (config) => {
+      const token = localStorage.getItem('token');
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+        console.log('Token añadido a la request:', token.substring(0, 20) + '...');
+      } else {
+        console.log('No hay token disponible');
+      }
+      return config;
+    },
+    (error) => {
+      console.error('Error en interceptor de request:', error);
+      return Promise.reject(error);
+    }
+  );
+
+  // Interceptor para manejar errores de autenticación
+  api.interceptors.response.use(
+    (response) => response,
+    (error) => {
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        console.log('Token expirado o inválido, redirigiendo al login...');
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        window.location.href = '/login';
+      }
+      return Promise.reject(error);
+    }
+  );
 
   // Función para mostrar notificaciones
   const showNotification = (type, message) => {
@@ -61,15 +91,11 @@ const DocenteDashboard = ({ user, onLogout }) => {
     const fetchActiveQuizzes = async () => {
       try {
         if (user && user.assignedGroups && user.assignedGroups.length > 0) {
-          // Obtener los IDs de los grados asignados
           const gradeIds = user.assignedGroups.map(group => group.gradeId);
-          
-          // Realizar la petición para obtener quizzes activos
           const response = await api.get('/quizzes/active', { 
             params: { gradeIds: gradeIds.join(',') } 
           });
           
-          // Mapear los resultados a un formato más útil
           const fetchedQuizzes = response.data.map(quiz => ({
             id: quiz.quiz_id,
             title: quiz.title,
@@ -93,7 +119,6 @@ const DocenteDashboard = ({ user, onLogout }) => {
   
     fetchActiveQuizzes();
   }, [user]);
-  
 
   // Función para cargar estudiantes de un grupo específico
   const fetchStudents = async (gradeId) => {
@@ -109,7 +134,7 @@ const DocenteDashboard = ({ user, onLogout }) => {
     }
   };
 
-  // Función para agregar un nuevo estudiante
+  // Función mejorada para agregar un nuevo estudiante
   const addStudent = async (e) => {
     e.preventDefault();
     if (!newStudent.name.trim()) {
@@ -117,20 +142,189 @@ const DocenteDashboard = ({ user, onLogout }) => {
       return;
     }
 
+    setLoading(true);
     try {
-      await api.post('/admin/students', {
+      console.log('Agregando estudiante:', {
+        name: newStudent.name,
+        grade_id: selectedGroup.gradeId
+      });
+
+      // Verificar que tenemos token antes de hacer la request
+      const token = localStorage.getItem('token');
+      if (!token) {
+        showNotification('error', 'Sesión expirada. Por favor, inicia sesión de nuevo.');
+        onLogout();
+        return;
+      }
+
+      const response = await api.post('/admin/students', {
         name: newStudent.name,
         grade_id: selectedGroup.gradeId
       });
       
+      console.log('Respuesta del servidor:', response.data);
+      
+      // Verificar que la respuesta tenga la estructura esperada
+      if (response.data.user) {
+        // Mostrar las credenciales del nuevo estudiante
+        setStudentCredentials(response.data.user);
+        setShowCredentials(true);
+        showNotification('success', 'Estudiante y usuario creados correctamente');
+      } else {
+        console.warn('Respuesta sin credenciales, intentando obtenerlas...');
+        // Si no vienen las credenciales, intentar obtenerlas del estudiante creado
+        if (response.data.student?.id) {
+          await getStudentCredentials(response.data.student.id, response.data.student.name);
+        }
+        showNotification('success', 'Estudiante creado correctamente');
+      }
+      
       setNewStudent({ name: '', grade_id: '' });
-      showNotification('success', 'Estudiante agregado correctamente');
-      fetchStudents(selectedGroup.gradeId); // Recargar la lista
+      
+      // Recargar la lista de estudiantes
+      fetchStudents(selectedGroup.gradeId);
       setShowAddStudentForm(false);
+      
     } catch (error) {
       console.error('Error al agregar estudiante:', error);
-      showNotification('error', 'Error al agregar el estudiante');
+      
+      // Manejo mejorado de errores
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        showNotification('error', 'Sesión expirada. Por favor, inicia sesión de nuevo.');
+        onLogout();
+      } else if (error.response?.data?.details) {
+        showNotification('error', `Error: ${error.response.data.details}`);
+      } else if (error.response?.data?.error) {
+        showNotification('error', error.response.data.error);
+      } else {
+        showNotification('error', 'Error al agregar el estudiante');
+      }
+    } finally {
+      setLoading(false);
     }
+  };
+
+  // Función mejorada para obtener credenciales de un estudiante
+  const getStudentCredentials = async (studentId, studentName) => {
+    setLoading(true);
+    try {
+      console.log('Obteniendo credenciales para estudiante:', { studentId, studentName });
+      
+      // Verificar token antes de hacer la request
+      const token = localStorage.getItem('token');
+      if (!token) {
+        showNotification('error', 'Sesión expirada. Por favor, inicia sesión de nuevo.');
+        onLogout();
+        return;
+      }
+
+      console.log('Token disponible:', token.substring(0, 20) + '...');
+      
+      const response = await api.get(`/admin/students/credentials/${studentId}`);
+      
+      console.log('Respuesta de credenciales:', response.data);
+      
+      // Si las credenciales se crearon ahora, mostrar mensaje especial
+      if (response.data.created_now) {
+        showNotification('success', 'Credenciales generadas automáticamente para el estudiante');
+      }
+      
+      setStudentCredentials(response.data);
+      setShowCredentials(true);
+      
+      // Recargar la lista de estudiantes para mostrar el username actualizado
+      if (response.data.created_now) {
+        fetchStudents(selectedGroup.gradeId);
+      }
+      
+    } catch (error) {
+      console.error('Error al obtener credenciales:', error);
+      console.log('Detalles del error:', {
+        status: error.response?.status,
+        data: error.response?.data,
+        headers: error.response?.headers
+      });
+      
+      // Manejo mejorado de errores
+      if (error.response?.status === 401) {
+        showNotification('error', 'Sesión expirada. Por favor, inicia sesión de nuevo.');
+        onLogout();
+      } else if (error.response?.status === 403) {
+        showNotification('error', 'Token inválido. Por favor, inicia sesión de nuevo.');
+        onLogout();
+      } else if (error.response?.status === 404) {
+        showNotification('error', 'Estudiante no encontrado');
+      } else if (error.response?.data?.details) {
+        showNotification('error', `Error: ${error.response.data.details}`);
+      } else {
+        showNotification('error', 'Error al obtener las credenciales del estudiante');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Función para verificar y renovar token si es necesario
+  const checkTokenValidity = () => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      console.log('No hay token disponible');
+      return false;
+    }
+
+    try {
+      // Decodificar el token para verificar expiración
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      const currentTime = Date.now() / 1000;
+      
+      if (payload.exp < currentTime) {
+        console.log('Token expirado');
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        onLogout();
+        return false;
+      }
+      
+      // Si el token expira en menos de 5 minutos, mostrar advertencia
+      if (payload.exp - currentTime < 300) { // 5 minutos
+        showNotification('warning', 'Tu sesión expirará pronto. Guarda tu trabajo.');
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('Error al verificar token:', error);
+      localStorage.removeItem('token');
+      onLogout();
+      return false;
+    }
+  };
+
+  // useEffect para verificar token periódicamente
+  useEffect(() => {
+    // Verificar token al cargar el componente
+    if (!checkTokenValidity()) {
+      return;
+    }
+
+    // Verificar token cada 30 segundos
+    const tokenCheckInterval = setInterval(() => {
+      checkTokenValidity();
+    }, 30000);
+
+    return () => clearInterval(tokenCheckInterval);
+  }, []);
+
+  // Función de logout mejorada
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    onLogout();
+  };
+
+  // Función para cerrar el modal de credenciales
+  const closeCredentialsModal = () => {
+    setShowCredentials(false);
+    setStudentCredentials(null);
   };
 
   // Función para eliminar un estudiante
@@ -142,7 +336,7 @@ const DocenteDashboard = ({ user, onLogout }) => {
     try {
       await api.delete(`/admin/students/${studentId}`);
       showNotification('success', 'Estudiante eliminado correctamente');
-      fetchStudents(selectedGroup.gradeId); // Recargar la lista
+      fetchStudents(selectedGroup.gradeId);
     } catch (error) {
       console.error('Error al eliminar estudiante:', error);
       showNotification('error', 'Error al eliminar el estudiante');
@@ -158,20 +352,172 @@ const DocenteDashboard = ({ user, onLogout }) => {
 
   // Función para iniciar un quiz
   const handleStartQuiz = (quizData) => {
-    // Guardar la información del quiz en localStorage para su uso posterior
     localStorage.setItem('currentQuiz', JSON.stringify({
       quizId: quizData.id,
       gradeId: quizData.gradeId,
       subjectId: quizData.subjectId
     }));
     
-    // Redirigir a la página del quiz
     navigate(`/docente/quiz/${quizData.id}`);
   };
 
   // Obtener quizzes activos para una materia específica
   const getActiveQuizzesForSubject = (subjectId) => {
     return activeQuizzes.filter(quiz => quiz.subjectId === subjectId);
+  };
+
+  // Modal de credenciales actualizado con mejor UX
+  const CredentialsModal = () => {
+    if (!showCredentials || !studentCredentials) return null;
+
+    return (
+      <div className="credentials-modal-overlay">
+        <div className="credentials-modal">
+          <div className="credentials-header">
+            <h3>
+              {studentCredentials.created_now ? 
+                '¡Credenciales generadas!' : 
+                'Credenciales del estudiante'
+              }
+            </h3>
+            <button className="modal-close-btn" onClick={closeCredentialsModal}>×</button>
+          </div>
+          <div className="credentials-content">
+            {studentCredentials.created_now ? (
+              <p>Se han generado nuevas credenciales para este estudiante:</p>
+            ) : (
+              <p>Credenciales de acceso del estudiante:</p>
+            )}
+            
+            <div className="credentials-info">
+              <div className="credential-item">
+                <label>Usuario:</label>
+                <span className="credential-value">{studentCredentials.username}</span>
+                <button 
+                  className="copy-btn"
+                  onClick={() => {
+                    navigator.clipboard.writeText(studentCredentials.username);
+                    showNotification('success', 'Usuario copiado al portapapeles');
+                  }}
+                  title="Copiar usuario"
+                >
+                  📋
+                </button>
+              </div>
+              <div className="credential-item">
+                <label>Contraseña:</label>
+                <span className="credential-value">{studentCredentials.password}</span>
+                <button 
+                  className="copy-btn"
+                  onClick={() => {
+                    navigator.clipboard.writeText(studentCredentials.password);
+                    showNotification('success', 'Contraseña copiada al portapapeles');
+                  }}
+                  title="Copiar contraseña"
+                >
+                  📋
+                </button>
+              </div>
+              <div className="credential-item">
+                <label>Tipo de usuario:</label>
+                <span className="credential-value">{studentCredentials.user_type}</span>
+              </div>
+            </div>
+            
+            <div className="credentials-note">
+              <p><strong>Importante:</strong> Comparte estas credenciales con el estudiante para que pueda acceder al sistema. Se recomienda que el estudiante cambie la contraseña en su primer acceso.</p>
+              {studentCredentials.created_now && (
+                <p><strong>Nota:</strong> Estas credenciales se han creado automáticamente y ya están guardadas en el sistema.</p>
+              )}
+            </div>
+            
+            <div className="credentials-actions">
+              <button 
+                className="btn btn-primary" 
+                onClick={closeCredentialsModal}
+              >
+                Entendido
+              </button>
+              <button 
+                className="btn btn-secondary"
+                onClick={() => {
+                  const text = `Usuario: ${studentCredentials.username}\nContraseña: ${studentCredentials.password}`;
+                  navigator.clipboard.writeText(text);
+                  showNotification('success', 'Todas las credenciales copiadas');
+                }}
+              >
+                Copiar Todo
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Tabla de estudiantes actualizada con mejor manejo de estados
+  const StudentsTable = () => {
+    if (loading) {
+      return (
+        <div className="loading-container">
+          <div className="loading-spinner"></div>
+          <p>Cargando estudiantes...</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="student-table-container">
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Nombre</th>
+              <th>Username</th>
+              <th>Tareas Completadas</th>
+              <th>Promedio</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {students.length > 0 ? (
+              students.map((student) => (
+                <tr key={student.id}>
+                  <td>{student.id}</td>
+                  <td>{student.name}</td>
+                  <td>{student.username || <em>Sin usuario</em>}</td>
+                  <td>{student.tasks_done || 0}</td>
+                  <td>{student.average_grade || '0.00'}</td>
+                  <td className="actions-cell">
+                    <button
+                      onClick={() => getStudentCredentials(student.id, student.name)}
+                      className="btn btn-info btn-sm"
+                      disabled={loading}
+                      title={student.username ? "Ver credenciales" : "Generar credenciales"}
+                    >
+                      {student.username ? "Ver Credenciales" : "Generar Credenciales"}
+                    </button>
+                    <button
+                      onClick={() => deleteStudent(student.id)}
+                      className="btn btn-danger btn-sm"
+                      disabled={loading}
+                    >
+                      Eliminar
+                    </button>
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan="6" className="empty-message">
+                  No hay estudiantes registrados en este grupo
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    );
   };
 
   // Renderiza el contenido según la sección activa
@@ -182,7 +528,7 @@ const DocenteDashboard = ({ user, onLogout }) => {
           <div className="dashboard-content">
             <div className="welcome-section">
               <h2>Bienvenido, {user?.name || 'Docente'}</h2>
-              <p className="date-display">Martes, 13 de mayo de 2025</p>
+              <p className="date-display">Viernes, 30 de mayo de 2025</p>
             </div>
             
             <div className="summary-cards">
@@ -335,11 +681,14 @@ const DocenteDashboard = ({ user, onLogout }) => {
                         />
                       </div>
                       <div className="form-buttons">
-                        <button type="submit" className="btn btn-primary">Guardar</button>
+                        <button type="submit" className="btn btn-primary" disabled={loading}>
+                          Guardar
+                        </button>
                         <button 
                           type="button" 
                           className="btn btn-secondary"
                           onClick={() => setShowAddStudentForm(false)}
+                          disabled={loading}
                         >
                           Cancelar
                         </button>
@@ -348,56 +697,8 @@ const DocenteDashboard = ({ user, onLogout }) => {
                   </div>
                 )}
                 
-                {/* Tabla de alumnos */}
-                <div className="student-table-container">
-                  {loading ? (
-                    <div className="loading">Cargando alumnos...</div>
-                  ) : (
-                    <table className="data-table">
-                      <thead>
-                        <tr>
-                          <th>ID</th>
-                          <th>Nombre</th>
-                          <th>Tareas Completadas</th>
-                          <th>Promedio</th>
-                          <th>Acciones</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {students.length > 0 ? (
-                          students.map((student) => (
-                            <tr key={student.id}>
-                              <td>{student.id}</td>
-                              <td>{student.name}</td>
-                              <td>{student.tasks_done || 0}</td>
-                              <td>{student.average_grade || '0.00'}</td>
-                              <td className="actions-cell">
-                                <button
-                                  onClick={() => {/* Editar estudiante */}}
-                                  className="btn btn-secondary btn-sm"
-                                >
-                                  Editar
-                                </button>
-                                <button
-                                  onClick={() => deleteStudent(student.id)}
-                                  className="btn btn-danger btn-sm"
-                                >
-                                  Eliminar
-                                </button>
-                              </td>
-                            </tr>
-                          ))
-                        ) : (
-                          <tr>
-                            <td colSpan="5" className="empty-message">
-                              No hay alumnos registrados en este grupo
-                            </td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  )}
-                </div>
+                <CredentialsModal />
+                <StudentsTable />
               </>
             ) : (
               <>
@@ -625,7 +926,7 @@ const DocenteDashboard = ({ user, onLogout }) => {
             <span className="nav-icon">⚙️</span>
             <span className="nav-text">Configuración</span>
           </button>
-          <button onClick={onLogout} className="logout-btn">
+          <button onClick={handleLogout} className="logout-btn">
             <span className="nav-icon">🚪</span>
             <span className="nav-text">Cerrar Sesión</span>
           </button>
@@ -638,7 +939,7 @@ const DocenteDashboard = ({ user, onLogout }) => {
         {notification && (
           <div className={`notification ${notification.type}`}>
             <span className="notification-icon">
-              {notification.type === 'success' ? '✓' : '✕'}
+              {notification.type === 'success' ? '✓' : notification.type === 'warning' ? '⚠' : '✕'}
             </span>
             {notification.message}
           </div>
