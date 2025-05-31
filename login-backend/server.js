@@ -16,18 +16,65 @@ app.use('/api/admin', adminRoutes);
 // Middleware para verificar tokens JWT
 const verifyToken = (req, res, next) => {
   const authHeader = req.headers.authorization;
+  
+  console.log('Headers de autorización:', authHeader); // Debug
+  
   if (authHeader) {
     const token = authHeader.split(' ')[1];
+    
+    console.log('Token extraído:', token ? 'Token presente' : 'Token vacío'); // Debug
+    
     jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
       if (err) {
-        return res.status(403).json({ error: 'Token inválido' });
+        console.error('Error de verificación de token:', err.message); // Debug
+        return res.status(403).json({ 
+          error: 'Token inválido',
+          details: err.message 
+        });
       }
+      
+      console.log('Usuario verificado:', user); // Debug
       req.user = user;
       next();
     });
   } else {
+    console.log('No se encontró header de autorización'); // Debug
     return res.status(401).json({ error: 'Token requerido' });
   }
+};
+
+// FUNCIÓN AUXILIAR: Generar username único
+const generateUniqueUsername = async (connection, name) => {
+  let baseUsername = name.toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // Remover acentos
+    .replace(/\s+/g, '.') // Reemplazar espacios con puntos
+    .replace(/[^a-z0-9.]/g, ''); // Remover caracteres especiales
+
+  let username = baseUsername;
+  let counter = 1;
+  
+  while (true) {
+    const [existingUser] = await connection.query(
+      'SELECT id FROM users WHERE username = ?',
+      [username]
+    );
+    
+    if (existingUser.length === 0) {
+      break; // Username disponible
+    }
+    
+    username = `${baseUsername}${counter}`;
+    counter++;
+  }
+  
+  return username;
+};
+
+// FUNCIÓN AUXILIAR: Generar contraseña temporal
+const generateTemporaryPassword = (name) => {
+  const currentYear = new Date().getFullYear();
+  return `${name.replace(/\s+/g, '').toLowerCase()}${currentYear}`;
 };
 
 // Ruta de login
@@ -60,9 +107,8 @@ app.post('/api/login', async (req, res) => {
 
     let assignedGroups = [];
 
-    // Si es un docente, buscar los grados asignados (versión actualizada)
+    // Si es un docente, buscar los grados asignados
     if (user.user_type === 'docente') {
-      // Obtener ID del docente
       const [teacherResult] = await pool.query(
         'SELECT id FROM teachers WHERE name = ?',
         [user.name]
@@ -70,8 +116,6 @@ app.post('/api/login', async (req, res) => {
       
       if (teacherResult.length > 0) {
         const teacherId = teacherResult[0].id;
-        
-        // Buscar grados asignados al docente
         const [gradesResult] = await pool.query(`
           SELECT g.id AS gradeId, g.name AS gradeName, g.level AS groupName
           FROM grades g
@@ -85,6 +129,7 @@ app.post('/api/login', async (req, res) => {
         }));
       }
     }
+
     // Generar token JWT
     const token = jwt.sign(
       { 
@@ -96,7 +141,6 @@ app.post('/api/login', async (req, res) => {
       { expiresIn: '1h' }
     );
 
-    // Enviar respuesta exitosa
     res.json({
       success: true,
       user: {
@@ -104,7 +148,7 @@ app.post('/api/login', async (req, res) => {
         username: user.username,
         name: user.name,
         role: user.user_type,
-        assignedGroups // Mantener el mismo nombre para compatibilidad
+        assignedGroups
       },
       token
     });
@@ -129,7 +173,7 @@ app.get('/', (req, res) => {
 app.get('/api/admin/students/:gradeId', verifyToken, async (req, res) => {
   try {
     const { gradeId } = req.params;
-    console.log(`Obteniendo estudiantes para el grado: ${gradeId}`); // Para debugging
+    console.log(`Obteniendo estudiantes para el grado: ${gradeId}`);
     const [rows] = await pool.query('SELECT * FROM students WHERE grade_id = ?', [gradeId]);
     res.json(rows);
   } catch (error) {
@@ -138,22 +182,89 @@ app.get('/api/admin/students/:gradeId', verifyToken, async (req, res) => {
   }
 });
 
-// Registrar un nuevo alumno
+// Registrar un nuevo alumno (corregido)
 app.post('/api/admin/students', verifyToken, async (req, res) => {
+  const connection = await pool.getConnection();
+  
   try {
     const { name, grade_id } = req.body;
+    
     if (!name || !grade_id) {
       return res.status(400).json({ error: 'Nombre y grado son requeridos' });
     }
 
-    const [result] = await pool.query(
-      'INSERT INTO students (name, grade_id) VALUES (?, ?)',
-      [name, grade_id]
+    console.log('Iniciando creación de estudiante:', { name, grade_id });
+
+    // Iniciar transacción
+    await connection.beginTransaction();
+
+    // 1. Verificar si ya existe un usuario con este nombre
+    const [existingUser] = await connection.query(
+      'SELECT id FROM users WHERE name = ? AND user_type = ?',
+      [name, 'estudiante']
     );
-    res.status(201).json({ message: 'Alumno registrado', id: result.insertId });
+
+    if (existingUser.length > 0) {
+      await connection.rollback();
+      return res.status(400).json({ 
+        error: 'Ya existe un usuario con este nombre' 
+      });
+    }
+
+    // 2. Generar username único
+    const username = await generateUniqueUsername(connection, name);
+    console.log('Username generado:', username);
+
+    // 3. Generar contraseña temporal
+    const tempPassword = generateTemporaryPassword(name);
+    console.log('Password generado:', tempPassword);
+
+    // 4. Crear el usuario en la tabla users
+    const [userResult] = await connection.query(
+      'INSERT INTO users (username, password, name, user_type) VALUES (?, ?, ?, ?)',
+      [username, tempPassword, name, 'estudiante']
+    );
+
+    console.log('Usuario creado con ID:', userResult.insertId);
+
+    // 5. Crear el estudiante en la tabla students
+    const [studentResult] = await connection.query(
+      'INSERT INTO students (name, grade_id, username) VALUES (?, ?, ?)',
+      [name, grade_id, username]
+    );
+
+    const studentId = studentResult.insertId;
+    console.log('Estudiante creado con ID:', studentId);
+
+    // Confirmar transacción
+    await connection.commit();
+    console.log('Transacción completada exitosamente');
+
+    res.status(201).json({ 
+      message: 'Estudiante y usuario creados correctamente',
+      student: {
+        id: studentId,
+        name: name,
+        grade_id: grade_id,
+        username: username
+      },
+      user: {
+        username: username,
+        password: tempPassword,
+        user_type: 'estudiante'
+      }
+    });
+
   } catch (error) {
-    console.error('Error al registrar alumno:', error);
-    res.status(500).json({ error: 'Error al registrar alumno' });
+    // Revertir transacción en caso de error
+    await connection.rollback();
+    console.error('Error detallado al registrar estudiante:', error);
+    res.status(500).json({ 
+      error: 'Error al registrar estudiante y usuario',
+      details: error.message 
+    });
+  } finally {
+    connection.release();
   }
 });
 
@@ -179,23 +290,233 @@ app.put('/api/admin/students/:id', verifyToken, async (req, res) => {
   }
 });
 
-// Eliminar un alumno
+// Eliminar un alumno (actualizado)
 app.delete('/api/admin/students/:id', verifyToken, async (req, res) => {
+  const connection = await pool.getConnection();
+  
   try {
     const { id } = req.params;
-    const [result] = await pool.query('DELETE FROM students WHERE id = ?', [id]);
+    
+    console.log('Eliminando estudiante ID:', id);
+    
+    // Iniciar transacción
+    await connection.beginTransaction();
 
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ error: 'Alumno no encontrado' });
+    // 1. Obtener información del estudiante antes de eliminarlo
+    const [student] = await connection.query(
+      'SELECT name, username FROM students WHERE id = ?', 
+      [id]
+    );
+
+    if (student.length === 0) {
+      await connection.rollback();
+      return res.status(404).json({ error: 'Estudiante no encontrado' });
     }
 
-    res.json({ message: 'Alumno eliminado correctamente' });
+    const studentData = student[0];
+    console.log('Datos del estudiante a eliminar:', studentData);
+
+    // 2. Eliminar el usuario asociado
+    if (studentData.username) {
+      // Eliminar por username
+      await connection.query(
+        'DELETE FROM users WHERE username = ? AND user_type = ?',
+        [studentData.username, 'estudiante']
+      );
+      console.log('Usuario eliminado por username:', studentData.username);
+    } else {
+      // Fallback: eliminar por nombre
+      await connection.query(
+        'DELETE FROM users WHERE name = ? AND user_type = ?',
+        [studentData.name, 'estudiante']
+      );
+      console.log('Usuario eliminado por nombre:', studentData.name);
+    }
+
+    // 3. Eliminar el estudiante
+    const [result] = await connection.query(
+      'DELETE FROM students WHERE id = ?', 
+      [id]
+    );
+
+    if (result.affectedRows === 0) {
+      await connection.rollback();
+      return res.status(404).json({ error: 'Estudiante no encontrado' });
+    }
+
+    console.log('Estudiante eliminado correctamente');
+
+    // Confirmar transacción
+    await connection.commit();
+
+    res.json({ 
+      message: 'Estudiante y usuario eliminados correctamente' 
+    });
+
   } catch (error) {
-    console.error('Error al eliminar alumno:', error);
-    res.status(500).json({ error: 'Error al eliminar alumno' });
+    await connection.rollback();
+    console.error('Error al eliminar estudiante:', error);
+    res.status(500).json({ 
+      error: 'Error al eliminar estudiante y usuario',
+      details: error.message 
+    });
+  } finally {
+    connection.release();
   }
 });
-// Rutas adicionales para el backend (server.js)
+
+// Obtener credenciales (generar si no existen)
+app.get('/api/admin/students/credentials/:studentId', verifyToken, async (req, res) => {
+  const connection = await pool.getConnection();
+  
+  try {
+    const { studentId } = req.params;
+    
+    console.log('Buscando credenciales para estudiante ID:', studentId);
+    console.log('Usuario autenticado:', req.user); // Debug: verificar usuario
+
+    // 1. Obtener información del estudiante
+    const [student] = await connection.query(
+      'SELECT id, name, username FROM students WHERE id = ?',
+      [studentId]
+    );
+    
+    if (student.length === 0) {
+      return res.status(404).json({ error: 'Estudiante no encontrado' });
+    }
+
+    const studentData = student[0];
+    console.log('Datos del estudiante:', studentData);
+
+    // 2. Buscar si ya existe un usuario para este estudiante
+    let userCredentials = null;
+    
+    // Primero buscar por username si existe
+    if (studentData.username) {
+      const [userByUsername] = await connection.query(
+        'SELECT username, password, user_type FROM users WHERE username = ? AND user_type = ?',
+        [studentData.username, 'estudiante']
+      );
+      
+      if (userByUsername.length > 0) {
+        userCredentials = userByUsername[0];
+        console.log('Credenciales encontradas por username:', userCredentials);
+      }
+    }
+    
+    // Si no se encontró por username, buscar por nombre
+    if (!userCredentials) {
+      const [userByName] = await connection.query(
+        'SELECT username, password, user_type FROM users WHERE name = ? AND user_type = ?',
+        [studentData.name, 'estudiante']
+      );
+      
+      if (userByName.length > 0) {
+        userCredentials = userByName[0];
+        console.log('Credenciales encontradas por nombre:', userCredentials);
+        
+        // Actualizar el username en la tabla students si no lo tenía
+        if (!studentData.username) {
+          await connection.query(
+            'UPDATE students SET username = ? WHERE id = ?',
+            [userCredentials.username, studentId]
+          );
+          console.log('Username actualizado en tabla students');
+        }
+      }
+    }
+
+    // 3. Si no existe usuario, crearlo
+    if (!userCredentials) {
+      console.log('No se encontraron credenciales, creando nuevas...');
+      
+      await connection.beginTransaction();
+      
+      try {
+        // Generar username único
+        const username = await generateUniqueUsername(connection, studentData.name);
+        console.log('Nuevo username generado:', username);
+        
+        // Generar contraseña temporal
+        const tempPassword = generateTemporaryPassword(studentData.name);
+        console.log('Nueva password generada:', tempPassword);
+        
+        // Crear el usuario
+        const [insertResult] = await connection.query(
+          'INSERT INTO users (username, password, name, user_type) VALUES (?, ?, ?, ?)',
+          [username, tempPassword, studentData.name, 'estudiante']
+        );
+        
+        console.log('Nuevo usuario creado con ID:', insertResult.insertId);
+        
+        // Actualizar el estudiante con el username
+        await connection.query(
+          'UPDATE students SET username = ? WHERE id = ?',
+          [username, studentId]
+        );
+        
+        console.log('Estudiante actualizado con username');
+        
+        await connection.commit();
+        
+        userCredentials = {
+          username: username,
+          password: tempPassword,
+          user_type: 'estudiante'
+        };
+        
+        console.log('Credenciales creadas exitosamente:', userCredentials);
+      } catch (createError) {
+        await connection.rollback();
+        console.error('Error al crear credenciales:', createError);
+        throw createError;
+      }
+    }
+    
+    res.json({
+      username: userCredentials.username,
+      password: userCredentials.password,
+      user_type: userCredentials.user_type,
+      created_now: !student[0].username // Indica si se acabaron de crear
+    });
+    
+  } catch (error) {
+    console.error('Error completo al obtener/crear credenciales:', error);
+    res.status(500).json({ 
+      error: 'Error al obtener credenciales del estudiante',
+      details: error.message 
+    });
+  } finally {
+    connection.release();
+  }
+});
+
+// Obtener credenciales por nombre (backup)
+app.get('/api/admin/students/credentials/name/:name', verifyToken, async (req, res) => {
+  try {
+    const { name } = req.params;
+    const decodedName = decodeURIComponent(name);
+    
+    const [user] = await pool.query(
+      'SELECT username, password, user_type FROM users WHERE name = ? AND user_type = ?',
+      [decodedName, 'estudiante']
+    );
+    
+    if (user.length === 0) {
+      return res.status(404).json({ error: 'Credenciales de estudiante no encontradas' });
+    }
+    
+    res.json({
+      username: user[0].username,
+      password: user[0].password,
+      user_type: user[0].user_type
+    });
+    
+  } catch (error) {
+    console.error('Error al obtener credenciales:', error);
+    res.status(500).json({ error: 'Error al obtener credenciales del estudiante' });
+  }
+});
 
 // Ruta para guardar un nuevo puntaje
 app.post('/api/admin/scores', verifyToken, async (req, res) => {
@@ -224,8 +545,8 @@ app.post('/api/admin/scores', verifyToken, async (req, res) => {
 // Obtener los mejores puntajes
 app.get('/api/admin/scores/top', verifyToken, async (req, res) => {
   try {
-    const limit = req.query.limit || 10; // Por defecto, devolver los 10 mejores
-    const gradeId = req.query.gradeId; // Opcional, si queremos filtrar por grado
+    const limit = req.query.limit || 10;
+    const gradeId = req.query.gradeId;
     
     let query = `
       SELECT name, score, correct_answers as correctAnswers, total_answered as totalAnswered, grade_id as gradeId,
@@ -233,13 +554,11 @@ app.get('/api/admin/scores/top', verifyToken, async (req, res) => {
       FROM scores
     `;
     
-    // Si se proporciona un gradeId, filtramos por ese grado
     if (gradeId) {
       query += ' WHERE grade_id = ?';
       const [results] = await pool.query(query + ' ORDER BY score DESC, correct_answers DESC LIMIT ?', [gradeId, parseInt(limit)]);
       res.json(results);
     } else {
-      // Si no, devolvemos los mejores puntajes en general
       const [results] = await pool.query(query + ' ORDER BY score DESC, correct_answers DESC LIMIT ?', [parseInt(limit)]);
       res.json(results);
     }
@@ -270,6 +589,7 @@ app.get('/api/admin/grades/:id', verifyToken, async (req, res) => {
     res.status(500).json({ error: 'Error al obtener información del grado' });
   }
 });
+
 app.get('/api/admin/scores/stats/:gradeId', verifyToken, async (req, res) => {
   try {
     const { gradeId } = req.params;
@@ -291,7 +611,6 @@ app.get('/api/admin/scores/stats/:gradeId', verifyToken, async (req, res) => {
       });
     }
     
-    // Convertir a un formato redondeado
     const stats = {
       totalAttempts: parseInt(results[0].totalAttempts),
       avgScore: Math.round(results[0].avgScore),
@@ -304,7 +623,6 @@ app.get('/api/admin/scores/stats/:gradeId', verifyToken, async (req, res) => {
     res.status(500).json({ error: 'Error al obtener estadísticas' });
   }
 });
-// server.js - Añadir rutas para gestionar quizzes
 
 // Rutas para quizzes
 app.get('/api/quizzes', verifyToken, async (req, res) => {
@@ -339,22 +657,19 @@ app.get('/api/admin/quizzes/grade/:gradeId', verifyToken, async (req, res) => {
 app.post('/api/admin/quizzes/activate', verifyToken, async (req, res) => {
   try {
     const { quizId, gradeId, isActive } = req.body;
-    const userId = req.user?.id || 1; // ID del usuario que está activando (por defecto 1 si no hay token)
+    const userId = req.user?.id || 1;
     
-    // Verificar si ya existe una activación para este quiz y grado
     const [existing] = await pool.query(
       'SELECT * FROM quiz_activations WHERE quiz_id = ? AND grade_id = ?',
       [quizId, gradeId]
     );
     
     if (existing.length > 0) {
-      // Actualizar el estado de activación
       await pool.query(
         'UPDATE quiz_activations SET is_active = ?, activated_by = ?, updated_at = NOW() WHERE quiz_id = ? AND grade_id = ?',
         [isActive ? 1 : 0, userId, quizId, gradeId]
       );
     } else {
-      // Crear una nueva activación
       await pool.query(
         'INSERT INTO quiz_activations (quiz_id, grade_id, is_active, activated_by) VALUES (?, ?, ?, ?)',
         [quizId, gradeId, isActive ? 1 : 0, userId]
@@ -374,7 +689,7 @@ app.post('/api/admin/quizzes/activate', verifyToken, async (req, res) => {
   }
 });
 
-// Obtener quizzes activos para un docente (basado en los grados asignados)
+// Obtener quizzes activos para un docente
 app.get('/api/quizzes/active', verifyToken, async (req, res) => {
   try {
     const { gradeIds } = req.query;
@@ -387,7 +702,6 @@ app.get('/api/quizzes/active', verifyToken, async (req, res) => {
     
     const gradeIdsArray = gradeIds.split(',');
     
-    // Obtener quizzes activos para los grados especificados
     const [rows] = await pool.query(`
       SELECT q.*, g.id as grade_id, g.name as grade_name, g.level as grade_level
       FROM quizzes q
