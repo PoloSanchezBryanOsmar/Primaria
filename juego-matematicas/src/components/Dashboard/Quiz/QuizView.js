@@ -2,7 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import WelcomeScreen from './components/WelcomeScreen';
-import QuizContainer from './components/QuizContainer';
+//import QuizContainer from './components/QuizContainer';
+import QuizContainerEnhanced from './components/QuizContainerEnhanced';
 import ResultScreen from './components/ResultScreen';
 import './Quiz.css';
 
@@ -115,7 +116,7 @@ function QuizView() {
           <WelcomeScreen onStart={startGame} />
         )}
         {gameState === 'playing' && (
-          <QuizContainer 
+          <QuizContainerEnhanced 
             playerName={playerName} 
             onGameEnd={endGame} 
           />

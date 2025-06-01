@@ -2,8 +2,10 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Routes, Route, NavLink, useNavigate, Navigate } from 'react-router-dom';
 import './AdminDashboard.css';
 import axios from 'axios';
-import QuizCatalog from './Quiz/QuizCatalog';
-import QuizPreview from './Quiz/QuizPreview';
+//import QuizCatalog from './Quiz/QuizCatalog';
+import QuizCatalogEnhanced from './Quiz/QuizCatalogEnhanced';
+import QuizPreviewEnhanced from './Quiz/QuizPreviewEnhanced';
+//import QuizPreview from './Quiz/QuizPreview';
 import QuizView from './Quiz/QuizView';
 import loguito1 from '../../img/loguito1.png';
 // Configuración de API (debe ir aquí)
@@ -1078,9 +1080,9 @@ const AdminDashboard = ({ onLogout }) => {
             />
           } />
           {/* Nueva ruta para el quiz */}
-          <Route path="contenido/quiz/:gradeId" element={<QuizCatalog />} />
-          <Route path="contenido/quiz/:gradeId/espanol" element={<QuizPreview />} />
-          <Route path="contenido/quiz/:gradeId/espanol/play" element={<QuizView />} />
+          <Route path="contenido/quiz/:gradeId" element={<QuizCatalogEnhanced />} />          
+          <Route path="contenido/quiz/:gradeId/:quizId" element={<QuizPreviewEnhanced />} />
+          <Route path="contenido/quiz/:gradeId/:quizId/play" element={<QuizView />} />
           <Route path="configuracion" element={<ConfiguracionPage />} />
           <Route path="*" element={<Navigate to="/admin/resumen" replace />} />
         </Routes>

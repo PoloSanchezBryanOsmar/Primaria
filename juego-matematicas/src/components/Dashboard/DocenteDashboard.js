@@ -17,6 +17,7 @@ const DocenteDashboard = ({ user, onLogout }) => {
   const [activeQuizzes, setActiveQuizzes] = useState([]);
   const [showCredentials, setShowCredentials] = useState(false);
   const [studentCredentials, setStudentCredentials] = useState(null);
+  const [teacherId, setTeacherId] = useState(null);
 
   // Datos de las materias
   const subjects = [
@@ -86,16 +87,31 @@ const DocenteDashboard = ({ user, onLogout }) => {
     setTimeout(() => setNotification(null), 5000);
   };
 
+  // Obtener ID del docente
+  useEffect(() => {
+    const fetchTeacherId = async () => {
+      try {
+        if (user && user.username) {
+          const response = await api.get(`/teacher/id/${user.username}`);
+          setTeacherId(response.data.teacher_id);
+        }
+      } catch (error) {
+        console.error('Error al obtener ID del docente:', error);
+      }
+    };
+
+    fetchTeacherId();
+  }, [user]);
+
   // Cargar quizzes activos para el docente
   useEffect(() => {
     const fetchActiveQuizzes = async () => {
       try {
-        if (user && user.assignedGroups && user.assignedGroups.length > 0) {
-          const gradeIds = user.assignedGroups.map(group => group.gradeId);
-          const response = await api.get('/quizzes/active', { 
-            params: { gradeIds: gradeIds.join(',') } 
-          });
+        if (teacherId) {
+          // Obtener quizzes que el admin activó para este docente
+          const response = await api.get(`/teacher/quizzes/available/${teacherId}`);
           
+          // Mapear los resultados a un formato más útil
           const fetchedQuizzes = response.data.map(quiz => ({
             id: quiz.quiz_id,
             title: quiz.title,
@@ -107,7 +123,8 @@ const DocenteDashboard = ({ user, onLogout }) => {
             time: quiz.time,
             difficulty: quiz.difficulty,
             icon: quiz.icon,
-            color: quiz.color
+            color: quiz.color,
+            isActiveForStudents: Boolean(parseInt(quiz.is_active_for_students))
           }));
           
           setActiveQuizzes(fetchedQuizzes);
@@ -116,9 +133,40 @@ const DocenteDashboard = ({ user, onLogout }) => {
         console.error('Error al cargar quizzes activos:', error);
       }
     };
-  
+
     fetchActiveQuizzes();
-  }, [user]);
+  }, [teacherId]);
+
+  // Función para activar/desactivar quiz para estudiantes
+  const toggleQuizForStudents = async (quiz) => {
+    try {
+      const newStatus = !quiz.isActiveForStudents;
+      
+      await api.post('/teacher/quizzes/activate-for-students', {
+        quizId: quiz.id,
+        gradeId: quiz.gradeId,
+        teacherId: teacherId,
+        isActiveForStudents: newStatus
+      });
+      
+      // Actualizar el estado local
+      const updatedQuizzes = activeQuizzes.map(q => {
+        if (q.id === quiz.id && q.gradeId === quiz.gradeId) {
+          return { ...q, isActiveForStudents: newStatus };
+        }
+        return q;
+      });
+      
+      setActiveQuizzes(updatedQuizzes);
+      
+      const actionText = newStatus ? 'activado' : 'desactivado';
+      showNotification('success', `Quiz ${actionText} para estudiantes correctamente`);
+      
+    } catch (error) {
+      console.error('Error al activar/desactivar quiz para estudiantes:', error);
+      showNotification('error', 'Error al cambiar el estado del quiz para estudiantes');
+    }
+  };
 
   // Función para cargar estudiantes de un grupo específico
   const fetchStudents = async (gradeId) => {
@@ -605,23 +653,45 @@ const DocenteDashboard = ({ user, onLogout }) => {
                           <div className="quiz-list">
                             {subjectQuizzes.map(quiz => (
                               <div key={quiz.id} className="quiz-list-item">
-                                <div className="quiz-list-icon" style={{ backgroundColor: quiz.color }}>{quiz.icon}</div>
+                                <div className="quiz-list-icon" style={{ backgroundColor: quiz.color }}>
+                                  {quiz.icon}
+                                </div>
                                 <div className="quiz-list-info">
                                   <span className="quiz-list-title">{quiz.title}</span>
-                                  <span className="quiz-list-detail">{quiz.questions} preguntas | {quiz.time} seg</span>
+                                  <span className="quiz-list-detail">
+                                    {quiz.questions} preguntas | {quiz.time} seg
+                                  </span>
+                                  <span className="quiz-status">
+                                    {quiz.isActiveForStudents 
+                                      ? '✅ Activo para estudiantes' 
+                                      : '⚪ Inactivo para estudiantes'
+                                    }
+                                  </span>
                                 </div>
-                                <button 
-                                  className="btn-sm btn-primary quiz-action-btn"
-                                  onClick={() => handleStartQuiz(quiz)}
-                                >
-                                  Iniciar
-                                </button>
+                                <div className="quiz-actions">
+                                  <button 
+                                    className="btn-sm quiz-action-btn"
+                                    onClick={() => handleStartQuiz(quiz)}
+                                    style={{ backgroundColor: '#3498db' }}
+                                  >
+                                    Probar
+                                  </button>
+                                  <button 
+                                    className={`btn-sm quiz-action-btn ${
+                                      quiz.isActiveForStudents ? 'btn-deactivate' : 'btn-activate'
+                                    }`}
+                                    onClick={() => toggleQuizForStudents(quiz)}
+                                  >
+                                    {quiz.isActiveForStudents ? 'Desactivar' : 'Activar'}
+                                  </button>
+                                </div>
                               </div>
                             ))}
                           </div>
                         ) : (
                           <div className="no-quizzes-message">
                             <span>No hay quizzes disponibles</span>
+                            <small>El administrador debe activar quizzes para este grado</small>
                           </div>
                         )}
                       </div>

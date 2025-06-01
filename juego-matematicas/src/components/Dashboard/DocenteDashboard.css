@@ -1366,3 +1366,132 @@
 .btn-info:hover {
   background-color: #138496;
 }
+
+/* Estilos adicionales para DocenteDashboard.css */
+
+/* Actualizar el quiz-list-item para incluir las nuevas acciones */
+.quiz-list-item {
+  display: flex;
+  align-items: center;
+  padding: 12px;
+  border-radius: 6px;
+  transition: background-color 0.2s;
+  margin-bottom: 8px;
+}
+
+.quiz-list-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  margin-right: 10px;
+}
+
+.quiz-status {
+  font-size: 11px;
+  margin-top: 4px;
+  font-weight: 500;
+}
+
+.quiz-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-end;
+}
+
+.quiz-action-btn {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+  min-width: 70px;
+  text-align: center;
+}
+
+.quiz-action-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.btn-activate {
+  background-color: #27ae60;
+  color: white;
+}
+
+.btn-activate:hover {
+  background-color: #2ecc71;
+}
+
+.btn-deactivate {
+  background-color: #e74c3c;
+  color: white;
+}
+
+.btn-deactivate:hover {
+  background-color: #f5554a;
+}
+
+/* Mejorar el mensaje de no quizzes */
+.no-quizzes-message {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background-color: #f8f9fa;
+  border-radius: 6px;
+  color: #999;
+  text-align: center;
+}
+
+.no-quizzes-message small {
+  font-size: 12px;
+  margin-top: 5px;
+  color: #bbb;
+}
+
+/* Responsive para las acciones de quiz */
+@media (max-width: 768px) {
+  .quiz-list-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .quiz-actions {
+    flex-direction: row;
+    width: 100%;
+    justify-content: space-between;
+    margin-top: 10px;
+  }
+  
+  .quiz-action-btn {
+    flex: 1;
+    margin: 0 5px;
+  }
+}
+
+/* Indicadores de estado mejorados */
+.quiz-status {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.quiz-status::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.quiz-list-item .quiz-status:contains("✅")::before {
+  background-color: #27ae60;
+}
+
+.quiz-list-item .quiz-status:contains("⚪")::before {
+  background-color: #bdc3c7;
+}
