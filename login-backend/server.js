@@ -1232,7 +1232,528 @@ app.get('/api/admin/export/quiz-data/:quizId', verifyToken, async (req, res) => 
   }
 });
 
+// ===============================================
+// RUTAS COMPLETAS PARA SISTEMA DE ASIGNACIONES
+// Agregar al final de tu server.js
+// ===============================================
+
+// Crear nueva asignación de quiz
+app.post('/api/teacher/assignments', verifyToken, async (req, res) => {
+  try {
+    const {
+      quizId,
+      gradeId, 
+      teacherId,
+      assignmentTitle,
+      assignmentDescription,
+      customTimeLimit,
+      startDate,
+      endDate
+    } = req.body;
+
+    console.log('Creando asignación:', { quizId, gradeId, teacherId, assignmentTitle, customTimeLimit, startDate, endDate });
+
+    // Verificar que el docente esté asignado a este grado
+    const [gradeCheck] = await pool.query(
+      'SELECT * FROM grades WHERE id = ? AND teacher_id = ?',
+      [gradeId, teacherId]
+    );
+    
+    if (gradeCheck.length === 0) {
+      return res.status(403).json({ 
+        error: 'No tienes permisos para crear asignaciones en este grado' 
+      });
+    }
+
+    // Insertar o actualizar en teacher_quiz_activations
+    const [existing] = await pool.query(
+      'SELECT * FROM teacher_quiz_activations WHERE quiz_id = ? AND grade_id = ? AND teacher_id = ?',
+      [quizId, gradeId, teacherId]
+    );
+
+    if (existing.length > 0) {
+      // Actualizar existente
+      await pool.query(`
+        UPDATE teacher_quiz_activations 
+        SET is_active_for_students = 1,
+            custom_time_limit = ?,
+            start_date = ?,
+            end_date = ?,
+            assignment_title = ?,
+            assignment_description = ?,
+            activated_at = NOW(),
+            updated_at = NOW()
+        WHERE quiz_id = ? AND grade_id = ? AND teacher_id = ?
+      `, [customTimeLimit, startDate, endDate, assignmentTitle, assignmentDescription, 
+          quizId, gradeId, teacherId]);
+      
+      console.log('Asignación actualizada exitosamente');
+    } else {
+      // Crear nuevo
+      await pool.query(`
+        INSERT INTO teacher_quiz_activations 
+        (quiz_id, grade_id, teacher_id, is_active_for_students, custom_time_limit, 
+         start_date, end_date, assignment_title, assignment_description)
+        VALUES (?, ?, ?, 1, ?, ?, ?, ?, ?)
+      `, [quizId, gradeId, teacherId, customTimeLimit, startDate, endDate, 
+          assignmentTitle, assignmentDescription]);
+      
+      console.log('Nueva asignación creada exitosamente');
+    }
+
+    res.json({ 
+      success: true, 
+      message: 'Asignación creada correctamente' 
+    });
+
+  } catch (error) {
+    console.error('Error al crear asignación:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Error al crear la asignación',
+      details: error.message 
+    });
+  }
+});
+
+// Obtener asignaciones de un docente
+app.get('/api/teacher/assignments/:teacherId', verifyToken, async (req, res) => {
+  try {
+    const { teacherId } = req.params;
+
+    console.log('Obteniendo asignaciones para docente:', teacherId);
+
+    const [assignments] = await pool.query(`
+      SELECT 
+        tqa.id,
+        tqa.quiz_id,
+        tqa.grade_id,
+        tqa.is_active_for_students,
+        tqa.custom_time_limit,
+        tqa.start_date,
+        tqa.end_date,
+        tqa.assignment_title,
+        tqa.assignment_description,
+        tqa.activated_at,
+        tqa.created_at,
+        q.title as quiz_title,
+        q.questions,
+        q.time_limit as original_time_limit,
+        q.difficulty,
+        q.icon,
+        q.color,
+        g.name as grade_name,
+        g.level as grade_level
+      FROM teacher_quiz_activations tqa
+      JOIN quizzes q ON tqa.quiz_id = q.quiz_id
+      JOIN grades g ON tqa.grade_id = g.id
+      WHERE tqa.teacher_id = ? AND tqa.is_active_for_students = 1
+      ORDER BY tqa.created_at DESC
+    `, [teacherId]);
+
+    console.log(`Encontradas ${assignments.length} asignaciones para docente ${teacherId}`);
+
+    res.json(assignments);
+
+  } catch (error) {
+    console.error('Error al obtener asignaciones:', error);
+    res.status(500).json({ error: 'Error al obtener asignaciones' });
+  }
+});
+
+// Actualizar asignación existente
+app.put('/api/teacher/assignments/:assignmentId', verifyToken, async (req, res) => {
+  try {
+    const { assignmentId } = req.params;
+    const {
+      assignmentTitle,
+      assignmentDescription,
+      customTimeLimit,
+      startDate,
+      endDate
+    } = req.body;
+
+    console.log('Actualizando asignación:', assignmentId, { assignmentTitle, customTimeLimit, startDate, endDate });
+
+    // Obtener la asignación para verificar permisos
+    const [assignment] = await pool.query(
+      'SELECT teacher_id FROM teacher_quiz_activations WHERE id = ?',
+      [assignmentId]
+    );
+
+    if (assignment.length === 0) {
+      return res.status(404).json({ error: 'Asignación no encontrada' });
+    }
+
+    // Actualizar la asignación
+    await pool.query(`
+      UPDATE teacher_quiz_activations 
+      SET assignment_title = ?,
+          assignment_description = ?,
+          custom_time_limit = ?,
+          start_date = ?,
+          end_date = ?,
+          updated_at = NOW()
+      WHERE id = ?
+    `, [assignmentTitle, assignmentDescription, customTimeLimit, startDate, endDate, assignmentId]);
+
+    console.log('Asignación actualizada exitosamente');
+
+    res.json({ 
+      success: true, 
+      message: 'Asignación actualizada correctamente' 
+    });
+
+  } catch (error) {
+    console.error('Error al actualizar asignación:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Error al actualizar la asignación' 
+    });
+  }
+});
+
+// Eliminar asignación
+app.delete('/api/teacher/assignments/:assignmentId', verifyToken, async (req, res) => {
+  try {
+    const { assignmentId } = req.params;
+
+    console.log('Eliminando asignación:', assignmentId);
+
+    // Obtener la asignación para verificar que existe
+    const [assignment] = await pool.query(
+      'SELECT teacher_id FROM teacher_quiz_activations WHERE id = ?',
+      [assignmentId]
+    );
+
+    if (assignment.length === 0) {
+      return res.status(404).json({ error: 'Asignación no encontrada' });
+    }
+
+    // Marcar como inactiva en lugar de eliminar completamente
+    await pool.query(`
+      UPDATE teacher_quiz_activations 
+      SET is_active_for_students = 0,
+          deactivated_at = NOW(),
+          updated_at = NOW()
+      WHERE id = ?
+    `, [assignmentId]);
+
+    console.log('Asignación eliminada exitosamente');
+
+    res.json({ 
+      success: true, 
+      message: 'Asignación eliminada correctamente' 
+    });
+
+  } catch (error) {
+    console.error('Error al eliminar asignación:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Error al eliminar la asignación' 
+    });
+  }
+});
+
+// Obtener asignaciones activas para estudiantes (con validación de fechas)
+app.get('/api/student/assignments/active/:gradeId', verifyToken, async (req, res) => {
+  try {
+    const { gradeId } = req.params;
+    const now = new Date();
+
+    console.log('Obteniendo asignaciones activas para grado:', gradeId, 'en fecha:', now);
+
+    const [assignments] = await pool.query(`
+      SELECT 
+        tqa.id,
+        tqa.quiz_id,
+        tqa.custom_time_limit,
+        tqa.start_date,
+        tqa.end_date,
+        tqa.assignment_title,
+        tqa.assignment_description,
+        q.title as quiz_title,
+        q.description as quiz_description,
+        q.questions,
+        q.difficulty,
+        q.icon,
+        q.color,
+        q.subject,
+        g.name as grade_name,
+        g.level as grade_level,
+        t.name as teacher_name
+      FROM teacher_quiz_activations tqa
+      JOIN quizzes q ON tqa.quiz_id = q.quiz_id
+      JOIN grades g ON tqa.grade_id = g.id
+      JOIN teachers t ON tqa.teacher_id = t.id
+      WHERE tqa.grade_id = ? 
+        AND tqa.is_active_for_students = 1
+        AND tqa.start_date <= ?
+        AND tqa.end_date >= ?
+      ORDER BY tqa.end_date ASC
+    `, [gradeId, now, now]);
+
+    console.log(`Encontradas ${assignments.length} asignaciones activas para grado ${gradeId}`);
+
+    res.json(assignments);
+
+  } catch (error) {
+    console.error('Error al obtener asignaciones activas:', error);
+    res.status(500).json({ error: 'Error al obtener asignaciones activas' });
+  }
+});
+
+// Obtener estadísticas de una asignación
+app.get('/api/teacher/assignments/:assignmentId/stats', verifyToken, async (req, res) => {
+  try {
+    const { assignmentId } = req.params;
+
+    console.log('Obteniendo estadísticas para asignación:', assignmentId);
+
+    // Obtener información de la asignación
+    const [assignment] = await pool.query(`
+      SELECT quiz_id, grade_id, start_date, end_date FROM teacher_quiz_activations WHERE id = ?
+    `, [assignmentId]);
+
+    if (assignment.length === 0) {
+      return res.status(404).json({ error: 'Asignación no encontrada' });
+    }
+
+    const { quiz_id, grade_id, start_date, end_date } = assignment[0];
+
+    // Obtener estadísticas de intentos en el periodo de la asignación
+    const [stats] = await pool.query(`
+      SELECT 
+        COUNT(*) as total_attempts,
+        COUNT(DISTINCT name) as unique_students,
+        AVG(score) as avg_score,
+        MAX(score) as max_score,
+        MIN(score) as min_score
+      FROM scores 
+      WHERE quiz_id = ? AND grade_id = ? 
+        AND created_at >= ? AND created_at <= ?
+    `, [quiz_id, grade_id, start_date, end_date]);
+
+    // Obtener total de estudiantes del grado
+    const [students] = await pool.query(`
+      SELECT COUNT(*) as total_students FROM students WHERE grade_id = ?
+    `, [grade_id]);
+
+    const result = {
+      total_attempts: parseInt(stats[0].total_attempts || 0),
+      unique_students: parseInt(stats[0].unique_students || 0),
+      avg_score: Math.round(stats[0].avg_score || 0),
+      max_score: parseInt(stats[0].max_score || 0),
+      min_score: parseInt(stats[0].min_score || 0),
+      total_students: parseInt(students[0].total_students || 0),
+      completion_rate: students[0].total_students > 0 ? 
+        Math.round((stats[0].unique_students / students[0].total_students) * 100) : 0
+    };
+
+    console.log('Estadísticas calculadas:', result);
+
+    res.json(result);
+
+  } catch (error) {
+    console.error('Error al obtener estadísticas:', error);
+    res.status(500).json({ error: 'Error al obtener estadísticas' });
+  }
+});
+
+// Obtener asignación específica por ID
+app.get('/api/teacher/assignments/single/:assignmentId', verifyToken, async (req, res) => {
+  try {
+    const { assignmentId } = req.params;
+
+    console.log('Obteniendo asignación específica:', assignmentId);
+
+    const [assignment] = await pool.query(`
+      SELECT 
+        tqa.*,
+        q.title as quiz_title,
+        q.questions,
+        q.time_limit as original_time_limit,
+        q.difficulty,
+        q.icon,
+        q.color,
+        g.name as grade_name,
+        g.level as grade_level
+      FROM teacher_quiz_activations tqa
+      JOIN quizzes q ON tqa.quiz_id = q.quiz_id
+      JOIN grades g ON tqa.grade_id = g.id
+      WHERE tqa.id = ?
+    `, [assignmentId]);
+
+    if (assignment.length === 0) {
+      return res.status(404).json({ error: 'Asignación no encontrada' });
+    }
+
+    res.json(assignment[0]);
+
+  } catch (error) {
+    console.error('Error al obtener asignación:', error);
+    res.status(500).json({ error: 'Error al obtener asignación' });
+  }
+});
+
+// Activar/desactivar asignación
+app.patch('/api/teacher/assignments/:assignmentId/toggle', verifyToken, async (req, res) => {
+  try {
+    const { assignmentId } = req.params;
+    const { isActive } = req.body;
+
+    console.log('Cambiando estado de asignación:', assignmentId, 'a:', isActive);
+
+    await pool.query(`
+      UPDATE teacher_quiz_activations 
+      SET is_active_for_students = ?,
+          updated_at = NOW()
+      WHERE id = ?
+    `, [isActive ? 1 : 0, assignmentId]);
+
+    const statusText = isActive ? 'activada' : 'desactivada';
+    
+    res.json({ 
+      success: true, 
+      message: `Asignación ${statusText} correctamente` 
+    });
+
+  } catch (error) {
+    console.error('Error al cambiar estado de asignación:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Error al cambiar estado de la asignación' 
+    });
+  }
+});
+
+// Obtener historial de asignaciones (incluyendo inactivas)
+app.get('/api/teacher/assignments/history/:teacherId', verifyToken, async (req, res) => {
+  try {
+    const { teacherId } = req.params;
+    const { limit = 50 } = req.query;
+
+    console.log('Obteniendo historial de asignaciones para docente:', teacherId);
+
+    const [assignments] = await pool.query(`
+      SELECT 
+        tqa.id,
+        tqa.quiz_id,
+        tqa.grade_id,
+        tqa.is_active_for_students,
+        tqa.custom_time_limit,
+        tqa.start_date,
+        tqa.end_date,
+        tqa.assignment_title,
+        tqa.assignment_description,
+        tqa.activated_at,
+        tqa.deactivated_at,
+        tqa.created_at,
+        q.title as quiz_title,
+        q.questions,
+        q.time_limit as original_time_limit,
+        g.name as grade_name,
+        g.level as grade_level
+      FROM teacher_quiz_activations tqa
+      JOIN quizzes q ON tqa.quiz_id = q.quiz_id
+      JOIN grades g ON tqa.grade_id = g.id
+      WHERE tqa.teacher_id = ?
+      ORDER BY tqa.created_at DESC
+      LIMIT ?
+    `, [teacherId, parseInt(limit)]);
+
+    res.json(assignments);
+
+  } catch (error) {
+    console.error('Error al obtener historial:', error);
+    res.status(500).json({ error: 'Error al obtener historial de asignaciones' });
+  }
+});
+
+// Duplicar asignación existente
+app.post('/api/teacher/assignments/:assignmentId/duplicate', verifyToken, async (req, res) => {
+  try {
+    const { assignmentId } = req.params;
+    const { newStartDate, newEndDate, newTitle } = req.body;
+
+    console.log('Duplicando asignación:', assignmentId);
+
+    // Obtener la asignación original
+    const [original] = await pool.query(`
+      SELECT * FROM teacher_quiz_activations WHERE id = ?
+    `, [assignmentId]);
+
+    if (original.length === 0) {
+      return res.status(404).json({ error: 'Asignación no encontrada' });
+    }
+
+    const originalAssignment = original[0];
+
+    // Crear nueva asignación basada en la original
+    await pool.query(`
+      INSERT INTO teacher_quiz_activations 
+      (quiz_id, grade_id, teacher_id, is_active_for_students, custom_time_limit, 
+       start_date, end_date, assignment_title, assignment_description)
+      VALUES (?, ?, ?, 1, ?, ?, ?, ?, ?)
+    `, [
+      originalAssignment.quiz_id,
+      originalAssignment.grade_id,
+      originalAssignment.teacher_id,
+      originalAssignment.custom_time_limit,
+      newStartDate,
+      newEndDate,
+      newTitle || `${originalAssignment.assignment_title} (Copia)`,
+      originalAssignment.assignment_description
+    ]);
+
+    res.json({ 
+      success: true, 
+      message: 'Asignación duplicada correctamente' 
+    });
+
+  } catch (error) {
+    console.error('Error al duplicar asignación:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Error al duplicar la asignación' 
+    });
+  }
+});
+
+// RUTA DE DEBUG OPCIONAL - Eliminar en producción
+app.get('/api/debug/activations/:gradeId', verifyToken, async (req, res) => {
+  try {
+    const { gradeId } = req.params;
+    
+    const [adminActivations] = await pool.query(`
+      SELECT qa.*, q.title FROM quiz_activations qa 
+      LEFT JOIN quizzes q ON qa.quiz_id = q.quiz_id 
+      WHERE qa.grade_id = ?
+    `, [gradeId]);
+    
+    const [teacherActivations] = await pool.query(`
+      SELECT tqa.*, q.title FROM teacher_quiz_activations tqa 
+      LEFT JOIN quizzes q ON tqa.quiz_id = q.quiz_id 
+      WHERE tqa.grade_id = ?
+    `, [gradeId]);
+    
+    res.json({
+      gradeId,
+      adminActivations,
+      teacherActivations,
+      currentTime: new Date()
+    });
+    
+  } catch (error) {
+    console.error('Error en debug:', error);
+    res.status(500).json({ error: 'Error en debug' });
+  }
+});
+
+console.log('✅ Rutas de asignaciones cargadas correctamente');
+
 // Iniciar servidor
 app.listen(PORT, () => {
   console.log(`Servidor ejecutándose en http://localhost:${PORT}`);
 });
+
