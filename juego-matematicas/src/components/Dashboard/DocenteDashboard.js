@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
+import SubjectDetailView from './SubjectDetailView';
 import './DocenteDashboard.css';
 
 const DocenteDashboard = ({ user, onLogout }) => {
@@ -18,6 +19,13 @@ const DocenteDashboard = ({ user, onLogout }) => {
   const [showCredentials, setShowCredentials] = useState(false);
   const [studentCredentials, setStudentCredentials] = useState(null);
   const [teacherId, setTeacherId] = useState(null);
+  // Estados para asignaciones
+  const [assignments, setAssignments] = useState([]);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingAssignment, setEditingAssignment] = useState(null);
+  // Nuevos estados para vista detallada de materias
+  const [selectedSubject, setSelectedSubject] = useState(null);
+  const [showSubjectDetail, setShowSubjectDetail] = useState(false);
 
   // Datos de las materias
   const subjects = [
@@ -108,10 +116,7 @@ const DocenteDashboard = ({ user, onLogout }) => {
     const fetchActiveQuizzes = async () => {
       try {
         if (teacherId) {
-          // Obtener quizzes que el admin activó para este docente
           const response = await api.get(`/teacher/quizzes/available/${teacherId}`);
-          
-          // Mapear los resultados a un formato más útil
           const fetchedQuizzes = response.data.map(quiz => ({
             id: quiz.quiz_id,
             title: quiz.title,
@@ -126,7 +131,6 @@ const DocenteDashboard = ({ user, onLogout }) => {
             color: quiz.color,
             isActiveForStudents: Boolean(parseInt(quiz.is_active_for_students))
           }));
-          
           setActiveQuizzes(fetchedQuizzes);
         }
       } catch (error) {
@@ -149,7 +153,6 @@ const DocenteDashboard = ({ user, onLogout }) => {
         isActiveForStudents: newStatus
       });
       
-      // Actualizar el estado local
       const updatedQuizzes = activeQuizzes.map(q => {
         if (q.id === quiz.id && q.gradeId === quiz.gradeId) {
           return { ...q, isActiveForStudents: newStatus };
@@ -197,7 +200,6 @@ const DocenteDashboard = ({ user, onLogout }) => {
         grade_id: selectedGroup.gradeId
       });
 
-      // Verificar que tenemos token antes de hacer la request
       const token = localStorage.getItem('token');
       if (!token) {
         showNotification('error', 'Sesión expirada. Por favor, inicia sesión de nuevo.');
@@ -212,15 +214,12 @@ const DocenteDashboard = ({ user, onLogout }) => {
       
       console.log('Respuesta del servidor:', response.data);
       
-      // Verificar que la respuesta tenga la estructura esperada
       if (response.data.user) {
-        // Mostrar las credenciales del nuevo estudiante
         setStudentCredentials(response.data.user);
         setShowCredentials(true);
         showNotification('success', 'Estudiante y usuario creados correctamente');
       } else {
         console.warn('Respuesta sin credenciales, intentando obtenerlas...');
-        // Si no vienen las credenciales, intentar obtenerlas del estudiante creado
         if (response.data.student?.id) {
           await getStudentCredentials(response.data.student.id, response.data.student.name);
         }
@@ -228,15 +227,12 @@ const DocenteDashboard = ({ user, onLogout }) => {
       }
       
       setNewStudent({ name: '', grade_id: '' });
-      
-      // Recargar la lista de estudiantes
       fetchStudents(selectedGroup.gradeId);
       setShowAddStudentForm(false);
       
     } catch (error) {
       console.error('Error al agregar estudiante:', error);
       
-      // Manejo mejorado de errores
       if (error.response?.status === 401 || error.response?.status === 403) {
         showNotification('error', 'Sesión expirada. Por favor, inicia sesión de nuevo.');
         onLogout();
@@ -258,7 +254,6 @@ const DocenteDashboard = ({ user, onLogout }) => {
     try {
       console.log('Obteniendo credenciales para estudiante:', { studentId, studentName });
       
-      // Verificar token antes de hacer la request
       const token = localStorage.getItem('token');
       if (!token) {
         showNotification('error', 'Sesión expirada. Por favor, inicia sesión de nuevo.');
@@ -272,7 +267,6 @@ const DocenteDashboard = ({ user, onLogout }) => {
       
       console.log('Respuesta de credenciales:', response.data);
       
-      // Si las credenciales se crearon ahora, mostrar mensaje especial
       if (response.data.created_now) {
         showNotification('success', 'Credenciales generadas automáticamente para el estudiante');
       }
@@ -280,7 +274,6 @@ const DocenteDashboard = ({ user, onLogout }) => {
       setStudentCredentials(response.data);
       setShowCredentials(true);
       
-      // Recargar la lista de estudiantes para mostrar el username actualizado
       if (response.data.created_now) {
         fetchStudents(selectedGroup.gradeId);
       }
@@ -293,7 +286,6 @@ const DocenteDashboard = ({ user, onLogout }) => {
         headers: error.response?.headers
       });
       
-      // Manejo mejorado de errores
       if (error.response?.status === 401) {
         showNotification('error', 'Sesión expirada. Por favor, inicia sesión de nuevo.');
         onLogout();
@@ -321,7 +313,6 @@ const DocenteDashboard = ({ user, onLogout }) => {
     }
 
     try {
-      // Decodificar el token para verificar expiración
       const payload = JSON.parse(atob(token.split('.')[1]));
       const currentTime = Date.now() / 1000;
       
@@ -333,8 +324,7 @@ const DocenteDashboard = ({ user, onLogout }) => {
         return false;
       }
       
-      // Si el token expira en menos de 5 minutos, mostrar advertencia
-      if (payload.exp - currentTime < 300) { // 5 minutos
+      if (payload.exp - currentTime < 300) {
         showNotification('warning', 'Tu sesión expirará pronto. Guarda tu trabajo.');
       }
       
@@ -349,12 +339,10 @@ const DocenteDashboard = ({ user, onLogout }) => {
 
   // useEffect para verificar token periódicamente
   useEffect(() => {
-    // Verificar token al cargar el componente
     if (!checkTokenValidity()) {
       return;
     }
 
-    // Verificar token cada 30 segundos
     const tokenCheckInterval = setInterval(() => {
       checkTokenValidity();
     }, 30000);
@@ -412,6 +400,191 @@ const DocenteDashboard = ({ user, onLogout }) => {
   // Obtener quizzes activos para una materia específica
   const getActiveQuizzesForSubject = (subjectId) => {
     return activeQuizzes.filter(quiz => quiz.subjectId === subjectId);
+  };
+
+  // Modal para crear/editar asignación
+  const AssignmentModal = ({ 
+    isOpen, 
+    onClose, 
+    quiz, 
+    teacherId, 
+    onSave, 
+    existingAssignment = null 
+  }) => {
+    const [formData, setFormData] = useState({
+      assignmentTitle: '',
+      assignmentDescription: '',
+      customTimeLimit: '',
+      startDate: '',
+      endDate: ''
+    });
+
+    useEffect(() => {
+      if (isOpen) {
+        if (existingAssignment) {
+          setFormData({
+            assignmentTitle: existingAssignment.assignment_title || `Quiz de ${quiz.title}`,
+            assignmentDescription: existingAssignment.assignment_description || '',
+            customTimeLimit: existingAssignment.custom_time_limit || quiz.time || 60,
+            startDate: existingAssignment.start_date ? 
+              new Date(existingAssignment.start_date).toISOString().slice(0, 16) : '',
+            endDate: existingAssignment.end_date ? 
+              new Date(existingAssignment.end_date).toISOString().slice(0, 16) : ''
+          });
+        } else {
+          const now = new Date();
+          const nextWeek = new Date(now);
+          nextWeek.setDate(nextWeek.getDate() + 7);
+          
+          setFormData({
+            assignmentTitle: `${quiz.title} - ${quiz.gradeName} ${quiz.gradeLevel}`,
+            assignmentDescription: `Evaluación de ${quiz.title.toLowerCase()} para el grupo.`,
+            customTimeLimit: quiz.time || 60,
+            startDate: now.toISOString().slice(0, 16),
+            endDate: nextWeek.toISOString().slice(0, 16)
+          });
+        }
+      }
+    }, [isOpen, quiz, existingAssignment]);
+
+    const handleSubmit = (e) => {
+      e.preventDefault();
+      
+      if (!formData.assignmentTitle.trim()) {
+        alert('El título de la asignación es requerido');
+        return;
+      }
+      
+      if (!formData.startDate || !formData.endDate) {
+        alert('Las fechas de inicio y fin son requeridas');
+        return;
+      }
+      
+      if (new Date(formData.startDate) >= new Date(formData.endDate)) {
+        alert('La fecha de fin debe ser posterior a la fecha de inicio');
+        return;
+      }
+      
+      if (formData.customTimeLimit < 30 || formData.customTimeLimit > 600) {
+        alert('El tiempo límite debe estar entre 30 segundos y 10 minutos');
+        return;
+      }
+
+      onSave(formData);
+    };
+
+    if (!isOpen) return null;
+
+    return (
+      <div className="credentials-modal-overlay">
+        <div className="credentials-modal assignment-modal">
+          <div className="credentials-header">
+            <h3>{existingAssignment ? 'Editar Asignación' : 'Crear Nueva Asignación'}</h3>
+            <button className="modal-close-btn" onClick={onClose}>×</button>
+          </div>
+          
+          <form onSubmit={handleSubmit} className="credentials-content">
+            <div className="form-section">
+              <h4>Información del Quiz</h4>
+              <div className="quiz-info-display">
+                <div className="quiz-info-item">
+                  <span className="label">Quiz:</span>
+                  <span className="value">{quiz.title}</span>
+                </div>
+                <div className="quiz-info-item">
+                  <span className="label">Grado:</span>
+                  <span className="value">{quiz.gradeName} - {quiz.gradeLevel}</span>
+                </div>
+                <div className="quiz-info-item">
+                  <span className="label">Preguntas:</span>
+                  <span className="value">{quiz.questions} preguntas</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="form-section">
+              <div className="form-group">
+                <label htmlFor="assignmentTitle">Título de la Asignación *</label>
+                <input
+                  type="text"
+                  id="assignmentTitle"
+                  value={formData.assignmentTitle}
+                  onChange={(e) => setFormData({...formData, assignmentTitle: e.target.value})}
+                  className="form-input"
+                  placeholder="Ej: Quiz de Gramática - Semana 1"
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="assignmentDescription">Descripción</label>
+                <textarea
+                  id="assignmentDescription"
+                  value={formData.assignmentDescription}
+                  onChange={(e) => setFormData({...formData, assignmentDescription: e.target.value})}
+                  className="form-input"
+                  placeholder="Descripción opcional de la asignación..."
+                  rows="3"
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="customTimeLimit">Tiempo Límite (segundos) *</label>
+                <input
+                  type="number"
+                  id="customTimeLimit"
+                  value={formData.customTimeLimit}
+                  onChange={(e) => setFormData({...formData, customTimeLimit: parseInt(e.target.value)})}
+                  className="form-input"
+                  min="30"
+                  max="600"
+                  step="5"
+                  required
+                />
+                <small style={{ color: '#666', fontSize: '0.8em' }}>
+                  Tiempo original: {quiz.time} segundos (30-600 segundos permitidos)
+                </small>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+                <div className="form-group">
+                  <label htmlFor="startDate">Fecha y Hora de Inicio *</label>
+                  <input
+                    type="datetime-local"
+                    id="startDate"
+                    value={formData.startDate}
+                    onChange={(e) => setFormData({...formData, startDate: e.target.value})}
+                    className="form-input"
+                    required
+                  />
+                </div>
+                
+                <div className="form-group">
+                  <label htmlFor="endDate">Fecha y Hora de Fin *</label>
+                  <input
+                    type="datetime-local"
+                    id="endDate"
+                    value={formData.endDate}
+                    onChange={(e) => setFormData({...formData, endDate: e.target.value})}
+                    className="form-input"
+                    required
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="credentials-actions">
+              <button type="button" className="btn btn-secondary" onClick={onClose}>
+                Cancelar
+              </button>
+              <button type="submit" className="btn btn-primary">
+                {existingAssignment ? 'Actualizar Asignación' : 'Crear Asignación'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
   };
 
   // Modal de credenciales actualizado con mejor UX
@@ -568,6 +741,108 @@ const DocenteDashboard = ({ user, onLogout }) => {
     );
   };
 
+  // Cargar asignaciones
+  const loadAssignments = async () => {
+    if (!teacherId) return;
+    
+    try {
+      const response = await api.get(`/teacher/assignments/${teacherId}`);
+      setAssignments(response.data);
+    } catch (error) {
+      console.error('Error al cargar asignaciones:', error);
+    }
+  };
+
+  // useEffect para cargar asignaciones cuando tengamos teacherId
+  useEffect(() => {
+    loadAssignments();
+  }, [teacherId]);
+
+  // Abrir modal para crear asignación
+  const openAssignmentModal = (quiz) => {
+    setSelectedQuiz(quiz);
+    setEditingAssignment(null);
+    setModalOpen(true);
+  };
+
+  // Guardar asignación
+  const saveAssignment = async (formData) => {
+    try {
+      const assignmentData = {
+        quizId: selectedQuiz.id,
+        gradeId: selectedQuiz.gradeId,
+        teacherId: teacherId,
+        assignmentTitle: formData.assignmentTitle,
+        assignmentDescription: formData.assignmentDescription,
+        customTimeLimit: formData.customTimeLimit,
+        startDate: formData.startDate,
+        endDate: formData.endDate
+      };
+
+      if (editingAssignment) {
+        await api.put(`/teacher/assignments/${editingAssignment.id}`, assignmentData);
+        showNotification('success', 'Asignación actualizada correctamente');
+      } else {
+        await api.post('/teacher/assignments', assignmentData);
+        showNotification('success', 'Asignación creada correctamente');
+      }
+
+      setModalOpen(false);
+      loadAssignments();
+      
+    } catch (error) {
+      console.error('Error al guardar asignación:', error);
+      showNotification('error', 'Error al guardar la asignación');
+    }
+  };
+
+  // Obtener estado de la asignación
+  const getAssignmentStatus = (assignment) => {
+    const now = new Date();
+    const start = new Date(assignment.start_date);
+    const end = new Date(assignment.end_date);
+
+    if (now < start) return 'programada';
+    if (now >= start && now <= end) return 'activa';
+    return 'finalizada';
+  };
+
+  // Renderizar estado de asignación
+  const renderAssignmentStatus = (assignment) => {
+    const status = getAssignmentStatus(assignment);
+    const statusConfig = {
+      programada: { label: 'Programada', class: 'status-scheduled', icon: '⏰' },
+      activa: { label: 'Activa', class: 'status-active', icon: '✅' },
+      finalizada: { label: 'Finalizada', class: 'status-finished', icon: '🏁' }
+    };
+
+    const config = statusConfig[status];
+    return (
+      <span className={`assignment-status ${config.class}`} style={{
+        padding: '4px 8px',
+        borderRadius: '12px',
+        fontSize: '0.8em',
+        fontWeight: '500',
+        backgroundColor: status === 'activa' ? '#d4edda' : status === 'programada' ? '#fff3cd' : '#f8d7da',
+        color: status === 'activa' ? '#155724' : status === 'programada' ? '#856404' : '#721c24'
+      }}>
+        {config.icon} {config.label}
+      </span>
+    );
+  };
+
+  // Función para abrir la vista detallada de una materia
+  const openSubjectDetail = (subject) => {
+    setSelectedSubject(subject);
+    setShowSubjectDetail(true);
+  };
+
+  // Función para volver a la vista de materias
+  const backToSubjects = () => {
+    setShowSubjectDetail(false);
+    setSelectedSubject(null);
+  };
+
   // Renderiza el contenido según la sección activa
   const renderContent = () => {
     switch (activeSection) {
@@ -631,9 +906,28 @@ const DocenteDashboard = ({ user, onLogout }) => {
         );
       
       case 'materias':
+        // Si hay una materia seleccionada, mostrar la vista detallada
+        if (showSubjectDetail && selectedSubject) {
+          const subjectQuizzes = getActiveQuizzesForSubject(selectedSubject.id);
+          return (
+            <SubjectDetailView
+              subject={selectedSubject}
+              subjectQuizzes={subjectQuizzes}
+              teacherId={teacherId}
+              onBack={backToSubjects}
+              showNotification={showNotification}
+              handleStartQuiz={handleStartQuiz}
+              api={api}
+            />
+          );
+        }
+
+        // Vista normal de materias (grid de materias)
         return (
           <div className="materias-content">
             <h2>Mis Materias</h2>
+            <p>Selecciona una materia para gestionar sus quizzes y asignaciones.</p>
+            
             <div className="subjects-grid">
               {subjects.map((subject) => {
                 const subjectQuizzes = getActiveQuizzesForSubject(subject.id);
@@ -647,58 +941,61 @@ const DocenteDashboard = ({ user, onLogout }) => {
                     </div>
                     
                     <div className="subject-content">
-                      <div className="subject-quizzes">
-                        <h4>Quizzes Disponibles</h4>
-                        {hasQuizzes ? (
-                          <div className="quiz-list">
-                            {subjectQuizzes.map(quiz => (
-                              <div key={quiz.id} className="quiz-list-item">
-                                <div className="quiz-list-icon" style={{ backgroundColor: quiz.color }}>
+                      <div className="subject-stats">
+                        <div className="stat-item">
+                          <span className="stat-number">{subjectQuizzes.length}</span>
+                          <span className="stat-label">Quiz{subjectQuizzes.length !== 1 ? 'zes' : ''} disponible{subjectQuizzes.length !== 1 ? 's' : ''}</span>
+                        </div>
+                        <div className="stat-item">
+                          <span className="stat-number">
+                            {subjectQuizzes.filter(q => q.isActiveForStudents).length}
+                          </span>
+                          <span className="stat-label">Activo{subjectQuizzes.filter(q => q.isActiveForStudents).length !== 1 ? 's' : ''} para estudiantes</span>
+                        </div>
+                      </div>
+
+                      {hasQuizzes ? (
+                        <div className="subject-preview">
+                          <h4>Quizzes disponibles:</h4>
+                          <div className="quiz-preview-list">
+                            {subjectQuizzes.slice(0, 3).map(quiz => (
+                              <div key={quiz.id} className="quiz-preview-item">
+                                <span className="quiz-preview-icon" style={{ backgroundColor: quiz.color }}>
                                   {quiz.icon}
-                                </div>
-                                <div className="quiz-list-info">
-                                  <span className="quiz-list-title">{quiz.title}</span>
-                                  <span className="quiz-list-detail">
-                                    {quiz.questions} preguntas | {quiz.time} seg
-                                  </span>
-                                  <span className="quiz-status">
-                                    {quiz.isActiveForStudents 
-                                      ? '✅ Activo para estudiantes' 
-                                      : '⚪ Inactivo para estudiantes'
-                                    }
+                                </span>
+                                <div className="quiz-preview-info">
+                                  <span className="quiz-preview-title">{quiz.title}</span>
+                                  <span className="quiz-preview-detail">
+                                    {quiz.questions} preguntas | {quiz.time}s
                                   </span>
                                 </div>
-                                <div className="quiz-actions">
-                                  <button 
-                                    className="btn-sm quiz-action-btn"
-                                    onClick={() => handleStartQuiz(quiz)}
-                                    style={{ backgroundColor: '#3498db' }}
-                                  >
-                                    Probar
-                                  </button>
-                                  <button 
-                                    className={`btn-sm quiz-action-btn ${
-                                      quiz.isActiveForStudents ? 'btn-deactivate' : 'btn-activate'
-                                    }`}
-                                    onClick={() => toggleQuizForStudents(quiz)}
-                                  >
-                                    {quiz.isActiveForStudents ? 'Desactivar' : 'Activar'}
-                                  </button>
-                                </div>
+                                <span className={`quiz-preview-status ${quiz.isActiveForStudents ? 'active' : 'inactive'}`}>
+                                  {quiz.isActiveForStudents ? '✅' : '⚪'}
+                                </span>
                               </div>
                             ))}
+                            {subjectQuizzes.length > 3 && (
+                              <div className="more-quizzes">
+                                +{subjectQuizzes.length - 3} más
+                              </div>
+                            )}
                           </div>
-                        ) : (
-                          <div className="no-quizzes-message">
-                            <span>No hay quizzes disponibles</span>
-                            <small>El administrador debe activar quizzes para este grado</small>
-                          </div>
-                        )}
-                      </div>
+                        </div>
+                      ) : (
+                        <div className="no-quizzes-preview">
+                          <span>No hay quizzes disponibles</span>
+                          <small>El administrador debe activar quizzes para tus grados</small>
+                        </div>
+                      )}
                       
                       <div className="subject-actions">
-                        <button className="btn-outline">Recursos</button>
-                        <button className="btn-outline">Actividades</button>
+                        <button 
+                          className="btn btn-primary"
+                          onClick={() => openSubjectDetail(subject)}
+                          disabled={!hasQuizzes}
+                        >
+                          {hasQuizzes ? 'Gestionar Materia' : 'Sin quizzes disponibles'}
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -735,7 +1032,6 @@ const DocenteDashboard = ({ user, onLogout }) => {
                   </div>
                 </div>
                 
-                {/* Formulario para agregar alumno */}
                 {showAddStudentForm && (
                   <div className="add-student-form">
                     <h3>Agregar Nuevo Alumno</h3>
@@ -938,7 +1234,6 @@ const DocenteDashboard = ({ user, onLogout }) => {
 
   return (
     <div className="docente-dashboard">
-      {/* Sidebar */}
       <div className="sidebar">
         <div className="sidebar-header">
           <div className="user-avatar">
@@ -1003,9 +1298,7 @@ const DocenteDashboard = ({ user, onLogout }) => {
         </div>
       </div>
       
-      {/* Contenido principal */}
       <div className="main-content">
-        {/* Notificación si existe */}
         {notification && (
           <div className={`notification ${notification.type}`}>
             <span className="notification-icon">
