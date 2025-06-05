@@ -1105,7 +1105,7 @@ const DocenteDashboard = ({ user, onLogout }) => {
           <div className="calificaciones-content">
             <h2>Gestión de Calificaciones</h2>
             <div className="calificaciones-filters">
-              <div className="filter-group">
+              <div>
                 <label>Seleccionar Grupo:</label>
                 <select className="form-select">
                   <option value="">Todos los grupos</option>
@@ -1116,7 +1116,7 @@ const DocenteDashboard = ({ user, onLogout }) => {
                   ))}
                 </select>
               </div>
-              <div className="filter-group">
+              <div>
                 <label>Seleccionar Materia:</label>
                 <select className="form-select">
                   <option value="">Todas las materias</option>
@@ -1127,7 +1127,7 @@ const DocenteDashboard = ({ user, onLogout }) => {
                   ))}
                 </select>
               </div>
-              <div className="filter-group">
+              <div>
                 <label>Periodo:</label>
                 <select className="form-select">
                   <option value="1">Primer Bimestre</option>
@@ -1137,11 +1137,11 @@ const DocenteDashboard = ({ user, onLogout }) => {
                   <option value="5">Quinto Bimestre</option>
                 </select>
               </div>
-              <button className="btn btn-primary">Buscar</button>
+              <button className="btn-buscar">Buscar</button>
             </div>
-            <div className="empty-state">
-              <div className="empty-icon">🔍</div>
-              <p>Selecciona un grupo y materia para gestionar calificaciones</p>
+            <div className="calificaciones-empty-panel">
+              <span className="empty-icon">🔍</span>
+              <div className="empty-text">Selecciona un grupo y materia para gestionar calificaciones</div>
             </div>
           </div>
         );
@@ -1241,7 +1241,7 @@ const DocenteDashboard = ({ user, onLogout }) => {
           </div>
           <div className="user-info">
             <h3>{user?.name || 'Docente'}</h3>
-            <p>{user?.role || 'Profesor'}</p>
+            <span className="user-role">Docente</span>
           </div>
         </div>
         
