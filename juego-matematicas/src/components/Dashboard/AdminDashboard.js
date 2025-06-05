@@ -8,6 +8,8 @@ import QuizPreviewEnhanced from './Quiz/QuizPreviewEnhanced';
 //import QuizPreview from './Quiz/QuizPreview';
 import QuizView from './Quiz/QuizView';
 import loguito1 from '../../img/loguito1.png';
+import { FaUserGraduate, FaChalkboardTeacher, FaUserTie } from "react-icons/fa";
+
 // Configuración de API (debe ir aquí)
 const api = axios.create({ baseURL: 'http://localhost:5000/api/admin' });
 
@@ -457,25 +459,28 @@ const UsuariosPage = ({
       </div>
       
       <div className="tab-navigation">
-        <div 
-          className={`tab-item ${activeTab === 'grades' ? 'active' : ''}`}
-          onClick={() => setActiveTab('grades')}
-        >
-          Grados y Grupos
-        </div>
-        <div 
-          className={`tab-item ${activeTab === 'teachers' ? 'active' : ''}`}
-          onClick={() => setActiveTab('teachers')}
-        >
-          Docentes
-        </div>
-        <div 
-          className={`tab-item ${activeTab === 'assignments' ? 'active' : ''}`}
-          onClick={() => setActiveTab('assignments')}
-        >
-          Asignaciones
-        </div>
-      </div>
+  <button
+    className={`tab-item tab-grados${activeTab === 'grades' ? ' active' : ''}`}
+    onClick={() => setActiveTab('grades')}
+  >
+    <FaUserGraduate className={`tab-icon ${activeTab === 'grades' ? 'active' : ''}`} />
+    Grados y Grupos
+  </button>
+  <button
+    className={`tab-item tab-docentes${activeTab === 'teachers' ? ' active' : ''}`}
+    onClick={() => setActiveTab('teachers')}
+  >
+    <FaChalkboardTeacher className={`tab-icon ${activeTab === 'teachers' ? 'active' : ''}`} />
+    Docentes
+  </button>
+  <button
+    className={`tab-item tab-asignaciones${activeTab === 'assignments' ? ' active' : ''}`}
+    onClick={() => setActiveTab('assignments')}
+  >
+    <FaUserTie className={`tab-icon ${activeTab === 'assignments' ? 'active' : ''}`} />
+    Asignaciones
+  </button>
+</div>
       
       {activeTab === 'grades' && renderGrades()}
       {activeTab === 'teachers' && renderTeachers()}

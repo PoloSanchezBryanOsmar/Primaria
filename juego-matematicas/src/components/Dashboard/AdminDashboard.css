@@ -34,14 +34,17 @@ html, body {
 }
 
 .sidebar {
-  width: 220px;
-  background-color: white;
+  width: 240px;
+  background: rgba(255,255,255,0.85);
+  backdrop-filter: blur(8px);
+  box-shadow: 2px 0 24px 0 rgba(80,80,180,0.08);
+  border-right: 1.5px solid #e0e7ff;
+  transition: width 0.2s;
   position: fixed;
   top: 0;
   left: 0;
   bottom: 0;
   z-index: 100;
-  box-shadow: 1px 0 5px rgba(0, 0, 0, 0.05);
   overflow-y: auto;
 }
 
@@ -59,6 +62,11 @@ html, body {
   gap: 10px;           /* Añade espacio entre imagen y texto */
   justify-content: center; /* Centra horizontalmente */
   height: 48px;        /* Ajusta la altura si es necesario */
+}
+
+.sidebar-brand img {
+  box-shadow: 0 2px 8px #b983ff44;
+  border: 2.5px solid #fff;
 }
 
 .admin-title {
@@ -95,6 +103,11 @@ html, body {
   border: none;
   width: 100%;
   transition: background 0.2s;
+  position: relative;
+  transition: background 0.25s, color 0.22s, box-shadow 0.22s, transform 0.18s;
+  border-radius: 12px;
+  font-weight: 600;
+  padding: 14px 22px;
 }
 
 .sidebar-menu a.menu-item:hover {
@@ -159,28 +172,55 @@ html, body {
 /* Estadísticas */
 .stats-grid {
   display: flex;
-  gap: 10px;
-  margin-bottom: 18px;
+  gap: 22px;
+  margin-bottom: 32px;
   justify-content: flex-start;
 }
 
 .stat-card {
   flex: 1 1 0;
   min-width: 90px;
-  min-height: 48px;
-  border-radius: 10px; /* Menos redondo */
-  box-shadow: 0 1px 6px 0 rgba(0,0,0,0.06);
-  padding: 10px 12px;
+  min-height: 90px;
+  border-radius: 18px;
+  box-shadow: 0 4px 32px 0 rgba(80,80,180,0.10), 0 1.5px 6px 0 rgba(0,0,0,0.04);
+  padding: 22px 24px;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   transition: transform 0.18s, box-shadow 0.18s;
   font-size: 0.93rem;
-  background: #fff;
+  background: linear-gradient(135deg, #f8fafc 60%, #e0e7ff 100%);
   color: #22223b;
   position: relative;
   overflow: hidden;
-  border: 1px solid #f1f1f1; /* O usa border: none; si prefieres sin borde */
+  border: none;
+}
+
+.card {
+  border-radius: 18px;
+  box-shadow: 0 6px 32px 0 rgba(80,80,180,0.10), 0 1.5px 6px 0 rgba(0,0,0,0.04);
+  border: none;
+  overflow: hidden;
+  position: relative;
+  background: #fff;
+  transition: box-shadow 0.2s, border-color 0.2s;
+  margin-bottom: 32px;
+}
+
+.card::before {
+  content: '';
+  display: block;
+  height: 6px;
+  width: 100%;
+  background: linear-gradient(90deg, #4ea8ff 0%, #b983ff 100%);
+  position: absolute;
+  top: 0; left: 0;
+  transition: background 0.3s;
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(30px);}
+  to { opacity: 1; transform: translateY(0);}
 }
 
 .stat-card:hover {
@@ -189,18 +229,19 @@ html, body {
 }
 
 .stat-title {
-  font-size: 0.95rem;
+  font-size: 1.08rem;
   font-weight: 700;
-  margin-bottom: 2px;
+  color: #7c3aed;
+  margin-bottom: 6px;
   letter-spacing: 0.5px;
-  color: inherit;
 }
 
 .stat-value {
-  font-size: 1.1rem;
+  font-size: 2.1rem;
   font-weight: 900;
-  letter-spacing: 1px;
-  color: inherit;
+  color: #22223b;
+  letter-spacing: 1.5px;
+  text-shadow: 0 2px 8px #b983ff22;
 }
 
 .stat-change {
@@ -384,22 +425,32 @@ html, body {
 }
 
 .btn-primary {
-  background-color: var(--primary-color);
-  color: white;
+  background: linear-gradient(90deg, #4ea8ff 0%, #b983ff 100%);
+  color: #fff;
+  font-weight: 700;
+  border: none;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px #b983ff22;
+  transition: background 0.2s, transform 0.1s;
 }
 
-.btn-primary:hover {
-  background-color: #3b5bd9;
+.btn-primary:hover, .btn-primary:focus {
+  background: linear-gradient(90deg, #b983ff 0%, #4ea8ff 100%);
+  transform: scale(1.04);
 }
 
 .btn-secondary {
-  background-color: #f1f5f9;
-  color: #4a5568;
-  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #4ea8ff;
+  border: 2px solid #4ea8ff;
+  border-radius: 8px;
+  font-weight: 600;
+  transition: background 0.2s, color 0.2s;
 }
 
 .btn-secondary:hover {
-  background-color: #e2e8f0;
+  background: #e0e7ff;
+  color: #7c3aed;
 }
 
 .btn-danger {
@@ -422,73 +473,55 @@ html, body {
 
 /* Tabs */
 .tab-navigation {
+  position: relative;
   display: flex;
-  border-bottom: 2.5px solid #e2e8f0;
-  margin-bottom: 24px;
-  background: #fff;
-  border-radius: 12px 12px 0 0;
-  overflow: hidden;
-  box-shadow: 0 2px 8px 0 rgba(0,0,0,0.03);
+  gap: 8px;
+  background: #f8fafc;
+  border-radius: 16px;
+  box-shadow: 0 2px 8px 0 rgba(80,80,180,0.04);
+  padding: 6px 8px;
+  margin-bottom: 32px;
+  overflow: visible;
 }
 
 .tab-item {
-  padding: 14px 36px;
-  cursor: pointer;
-  border: none;
-  outline: none;
-  background: none;
+  position: relative;
+  border-radius: 12px;
+  padding: 12px 32px;
   font-size: 1.08rem;
-  font-weight: 600;
+  font-weight: 700;
   color: #888;
-  transition: background 0.2s, color 0.2s, border-bottom 0.2s;
-  border-bottom: 3px solid transparent;
+  background: none;
+  border: none;
+  cursor: pointer;
+  z-index: 1;
+  transition: color 0.2s;
+  overflow: hidden;
 }
 
-.tab-item:not(:last-child) {
-  border-right: 1px solid #f3f4fa;
-}
-
+/* Tab activo con gradiente y sombra para resaltar */
 .tab-item.active,
 .tab-item.selected {
-  color: #2485fb;
-  background: #f3f8ff;
-  border-bottom: 3px solid #2485fb;
+  color: #fff !important;
+  background: linear-gradient(90deg, #4ea8ff 0%, #b983ff 100%);
+  border-bottom: 3px solid #4ea8ff;
+  box-shadow: 0 4px 18px 0 #b983ff22;
+  font-weight: 800;
   position: relative;
   z-index: 1;
+  transition: background 0.2s, color 0.2s, box-shadow 0.2s;
 }
 
-/* Colores para cada tab activo (puedes asignar por clase si lo deseas) */
-.tab-item.tab-grados.active,
-.tab-item.tab-docentes.active,
-.tab-item.tab-asignaciones.active {
-  /* Elimina color y fondo personalizados */
-  /* color: #b983ff; */
-  /* border-bottom-color: #b983ff; */
-  /* background: #f7f3ff; */
-  color: #2485fb;
-  border-bottom-color: #2485fb;
-  background: #f3f8ff;
-}
-.tab-item.tab-grados.active {
-  color: #b983ff;
-  border-bottom-color: #b983ff;
-  background: #f7f3ff;
-}
-.tab-item.tab-docentes.active {
-  color: #ffe066;
-  border-bottom-color: #ffe066;
-  background: #fffde7;
-}
-.tab-item.tab-asignaciones.active {
-  color: #43e6b0;
-  border-bottom-color: #43e6b0;
-  background: #e7fff7;
+@keyframes tabPop {
+  0% { transform: scale(0.92); opacity: 0.7;}
+  80% { transform: scale(1.06);}
+  100% { transform: scale(1); opacity: 1;}
 }
 
-/* Hover para tabs */
-.tab-item:hover:not(.active) {
+.tab-item:not(.active):hover {
   background: #f3f4fa;
   color: #2485fb;
+  transition: background 0.2s, color 0.2s;
 }
 
 /* Formularios */
@@ -625,108 +658,84 @@ html, body {
 
 .grades-container {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 1.5rem;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 2.5rem; /* Más separación */
+  padding: 1.5rem 0.5rem 1.5rem 0.5rem; /* Espacio a los lados */
 }
 
 .grade-card {
-  background-color: #fff;
-  border-radius: 14px;
-  box-shadow: 0 2px 12px 0 rgba(0,0,0,0.07);
-  padding: 1.5rem;
-  transition: transform 0.18s, box-shadow 0.18s;
-  display: flex;
-  flex-direction: column;
-  border-top: 5px solid #b983ff; /* Color principal, puedes alternar */
-  margin-bottom: 18px;
-  position: relative;
+  background: rgba(255,255,255,0.93);
+  backdrop-filter: blur(4px);
+  border-radius: 22px;
+  box-shadow: 0 8px 32px 0 rgba(80,80,180,0.13);
+  padding: 28px 28px 18px 28px;
+  margin-bottom: 0;
+  border-top: 5px solid #b983ff;
+  transition: transform 0.18s, box-shadow 0.18s, border-top 0.3s;
 }
 
-.grade-card:hover {
-  transform: translateY(-4px) scale(1.02);
-  box-shadow: 0 8px 24px rgba(0,0,0,0.10);
-}
-
-/* Puedes alternar colores para variedad visual */
-.grade-card.card-purple { border-top: 5px solid #b983ff; }
-.grade-card.card-yellow { border-top: 5px solid #ffe066; }
-.grade-card.card-blue   { border-top: 5px solid #4ea8ff; }
-.grade-card.card-green  { border-top: 5px solid #43e6b0; }
-
-/* Título del grado/grupo */
 .grade-title {
-  font-size: 1.18rem;
-  font-weight: 700;
-  color: #22223b;
-  margin-bottom: 0.4rem;
+  margin-bottom: 0.7rem;
+  margin-top: 0.2rem;
+  font-size: 1.22rem;
+  font-weight: 800;
+  letter-spacing: 0.5px;
 }
 
-/* Profesor */
 .grade-teacher {
-  font-size: 1rem;
+  margin-bottom: 1.5rem;
+  font-size: 1.02rem;
   color: #666;
-  margin-bottom: 1.1rem;
-}
-.grade-teacher b {
-  color: #2485fb;
 }
 
-/* Botones */
 .grade-actions {
   display: flex;
-  gap: 0.75rem;
-  margin-bottom: 1.25rem;
-}
-.grade-actions .btn-primary {
-  background: #2485fb;
-  color: #fff;
-  border-radius: 7px;
-  border: none;
-  padding: 8px 18px;
-  font-weight: 600;
-  transition: background 0.2s;
-}
-.grade-actions .btn-primary:hover {
-  background: #1d6fd2;
-}
-.grade-actions .btn-secondary {
-  background: #f3f4fa;
-  color: #2485fb;
-  border-radius: 7px;
-  border: none;
-  padding: 8px 18px;
-  font-weight: 600;
-  transition: background 0.2s;
-}
-.grade-actions .btn-secondary:hover {
-  background: #e3f2fd;
+  justify-content: center;
+  align-items: center;
+  gap: 18px; /* Espacio entre botones */
+  margin-bottom: 1.7rem;
 }
 
-/* Estadísticas dentro de la tarjeta */
 .grade-stats {
   display: flex;
+  flex-direction: row;
   justify-content: space-between;
+  align-items: flex-end;
+  padding: 1.5rem 1.2rem 0 1.2rem; /* <-- padding lateral agregado */
   margin-top: auto;
-  padding-top: 1.25rem;
   border-top: 1px solid #eee;
+  gap: 2.5rem;
+  text-align: center;
+  box-sizing: border-box;
+  width: 100%;
 }
 
-.stat-item {
+.grade-stats .stat-item {
+  flex: 1 1 0;
   display: flex;
   flex-direction: column;
   align-items: center;
-  text-align: center;
+  min-width: 0; /* <-- evita overflow */
+  word-break: break-word;
 }
 
-.stat-value {
-  font-weight: 700;
-  color: #2485fb;
-  font-size: 1.25rem;
+.grade-stats .stat-value {
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: #22223b;
+  margin-bottom: 2px;
 }
 
-.stat-label {
+.grade-stats .stat-label {
   font-size: 0.85rem;
   color: #666;
+  font-weight: 500;
+  letter-spacing: 0.1px;
+  line-height: 1.1;
+  white-space: nowrap;
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Media queries para responsividad */
@@ -753,12 +762,16 @@ html, body {
   font-size: 0.875rem;
   display: flex;
   align-items: center;
-  animation: fadeIn 0.3s ease-in-out;
+  animation: fadeIn 0.4s;
+  box-shadow: 0 2px 12px #b983ff22;
+  border-radius: 10px;
+  font-size: 1rem;
+  font-weight: 600;
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(-10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; transform: translateY(-10px);}
+  to { opacity: 1; transform: translateY(0);}
 }
 
 .notification.success {
@@ -827,15 +840,40 @@ html, body {
   }
 }
 
+@media (max-width: 900px) {
+  .sidebar {
+    width: 60px;
+    min-width: 60px;
+    padding: 0;
+  }
+  .main-content {
+    margin-left: 60px;
+    padding: 10px;
+  }
+  .sidebar-brand span,
+  .admin-title,
+  .sidebar-menu .menu-item span {
+    display: none;
+  }
+  .sidebar-menu .menu-item {
+    justify-content: center;
+    padding: 16px 0;
+  }
+}
+
 /* AdminDashboard.css */
 .edukids-edu {
-  color: #22223b; /* Azul oscuro o negro, ajusta según tu logo */
-  font-weight: bold;
+  color: #4ea8ff;
+  font-weight: 900;
+  font-size: 1.3rem;
+  letter-spacing: 1px;
 }
 
 .edukids-kids {
-  color: #2485fb; /* Amarillo/naranja, ajusta según tu logo */
-  font-weight: bold;
+  color: #b983ff;
+  font-weight: 900;
+  font-size: 1.3rem;
+  letter-spacing: 1px;
 }
 
 /* Tamaño más compacto y colores suaves */
@@ -941,24 +979,142 @@ html, body {
 /* Tabs: solo azul al seleccionar */
 .tab-item.active,
 .tab-item.selected {
-  color: #2485fb;
-  background: #f3f8ff;
-  border-bottom: 3px solid #2485fb;
+  color: #fff !important;
+  background: linear-gradient(90deg, #4ea8ff 0%, #b983ff 100%);
+  border-bottom: 3px solid #4ea8ff;
+  box-shadow: 0 4px 18px 0 #b983ff22;
+  font-weight: 800;
   position: relative;
   z-index: 1;
+  transition: background 0.2s, color 0.2s, box-shadow 0.2s;
 }
 
-/* Elimina colores personalizados en tabs activos */
-.tab-item.tab-grados.active,
-.tab-item.tab-docentes.active,
-.tab-item.tab-asignaciones.active {
-  color: #2485fb;
-  border-bottom-color: #2485fb;
-  background: #f3f8ff;
-}
+
 
 /* Sección de título con resaltado */
 .section-title .highlight-purple {
   color: #b983ff;
   font-weight: 800;
+}
+
+.grade-card {
+  animation: fadeInUp 0.7s cubic-bezier(.23,1.01,.32,1) both;
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(30px);}
+  to { opacity: 1; transform: translateY(0);}
+}
+
+/* Animación y gradiente para los ítems del menú lateral */
+.sidebar-menu .menu-item {
+  transition: background 0.25s, color 0.22s, box-shadow 0.22s, transform 0.18s;
+  border-radius: 12px;
+  font-weight: 600;
+}
+
+.sidebar-menu .menu-item:hover,
+.sidebar-menu .menu-item:focus {
+  background: linear-gradient(90deg, #4ea8ff 0%, #b983ff 100%);
+  color: #fff !important;
+  transform: scale(1.04);
+  box-shadow: 0 4px 18px 0 #b983ff22;
+}
+
+.sidebar-menu .menu-item.active {
+  background: linear-gradient(90deg, #4ea8ff 0%, #b983ff 100%);
+  color: #fff !important;
+  font-weight: 800;
+  box-shadow: 0 4px 18px 0 #b983ff22;
+  transform: scale(1.06);
+}
+
+.sidebar-menu .menu-item.logout {
+  color: #666 !important;
+}
+
+.sidebar-menu .menu-item.logout:hover,
+.sidebar-menu .menu-item.logout:focus,
+.sidebar-menu .menu-item.logout.active {
+  background: linear-gradient(90deg, #ff6b6b 0%, #b983ff 100%);
+  color: #fff !important;
+  font-weight: 800;
+  box-shadow: 0 4px 18px 0 #ff6b6b22;
+  transform: scale(1.06);
+}
+
+/* Mejora visual para los botones del menú lateral */
+.sidebar-menu .menu-item {
+  border-radius: 22px !important;         /* Más redondeado */
+  box-shadow: 0 2px 12px 0 #b983ff18;    /* Sombra suave */
+  margin-bottom: 10px;                   /* Espacio entre botones */
+  background: transparent;
+  border: 2px solid transparent;         /* Borde para transición */
+  transition: 
+    background 0.25s, 
+    color 0.22s, 
+    box-shadow 0.22s, 
+    transform 0.18s,
+    border-color 0.22s;
+  font-weight: 600;
+  padding: 14px 22px;
+}
+
+.sidebar-menu .menu-item:hover,
+.sidebar-menu .menu-item:focus {
+  background: linear-gradient(90deg, #4ea8ff 0%, #b983ff 100%);
+  color: #fff !important;
+  border-color: #b983ff;
+  transform: scale(1.04);
+  box-shadow: 0 4px 18px 0 #b983ff33;
+}
+
+.sidebar-menu .menu-item.active {
+  background: linear-gradient(90deg, #4ea8ff 0%, #b983ff 100%);
+  color: #fff !important;
+  font-weight: 800;
+  border-color: #4ea8ff;
+  box-shadow: 0 4px 18px 0 #b983ff33;
+  transform: scale(1.06);
+}
+
+.sidebar-menu .menu-item.logout {
+  color: #666 !important;
+  border-radius: 22px !important;
+}
+
+.sidebar-menu .menu-item.logout:hover,
+.sidebar-menu .menu-item.logout:focus,
+.sidebar-menu .menu-item.logout.active {
+  background: linear-gradient(90deg, #ff6b6b 0%, #b983ff 100%);
+  color: #fff !important;
+  border-color: #ff6b6b;
+  font-weight: 800;
+  box-shadow: 0 4px 18px 0 #ff6b6b33;
+  transform: scale(1.06);
+}
+
+.tab-icon {
+  font-size: 1.5rem;
+  margin-right: 12px;
+  vertical-align: middle;
+  transition: color 0.2s;
+  color: #bdbdbd; /* gris por defecto */
+}
+
+.tab-item.tab-grados .tab-icon {
+  color: #4ea8ff;
+}
+.tab-item.tab-docentes .tab-icon {
+  color: #b983ff;
+}
+.tab-item.tab-asignaciones .tab-icon {
+  color: #43e6b0;
+}
+
+/* Cuando el tab está activo, el ícono es blanco */
+.tab-item.active .tab-icon,
+.tab-item.selected .tab-icon {
+  color: #fff !important;
+  filter: drop-shadow(0 2px 8px #b983ff44);
 }
